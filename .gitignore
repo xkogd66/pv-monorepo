@@ -1,5 +1,6 @@
 pv-spa/.env
 pv-spa/.env.*
 pv-spa/node_modules/
+tools/node_modules
 pv-spa/dist/
 pv-spa/public/env-config.js
