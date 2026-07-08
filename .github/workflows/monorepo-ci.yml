@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Force rebuild/redeploy all services (no source diff needed)"
+        type: boolean
+        default: false
 
 jobs:
   build-and-deploy:
@@ -70,15 +76,17 @@ jobs:
           echo "$CHANGED_FILES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+          FORCE="${{ github.event_name == 'workflow_dispatch' && inputs.force }}"
+
           # Detect code changes in the service folder
-          if echo "$CHANGED_FILES" | grep -E "^${{ matrix.path }}(/|$)" >/dev/null; then
+          if [ "$FORCE" = "true" ] || echo "$CHANGED_FILES" | grep -E "^${{ matrix.path }}(/|$)" >/dev/null; then
             echo "changed=true" >> $GITHUB_OUTPUT
           else
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
 
           # Detect manifest changes
-          if echo "$CHANGED_FILES" | grep -E "^k8s/base/${{ matrix.name }}(/|$)" >/dev/null || \
+          if [ "$FORCE" = "true" ] || echo "$CHANGED_FILES" | grep -E "^k8s/base/${{ matrix.name }}(/|$)" >/dev/null || \
              echo "$CHANGED_FILES" | grep -E "^${{ matrix.path }}/k8s(/|$)" >/dev/null; then
             echo "manifests_changed=true" >> $GITHUB_OUTPUT
           else
