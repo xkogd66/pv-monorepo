@@ -8,6 +8,9 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -49,13 +52,6 @@ jobs:
             deployment: pv-worker
             container: worker
             manifests_dir: k8s/base/pv-temporal-worker
-          - name: pv-uploader
-            path: pv-uploader
-            context: pv-uploader
-            image: ghcr.io/xkogd66/pv-uploader
-            deployment: ""
-            container: ""
-            manifests_dir: k8s/base/pv-uploader
 
     steps:
       - name: Checkout
