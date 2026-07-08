@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pv-worker-config
+  namespace: pv
+data:
+  TEMPORAL_ADDRESS: "temporal-frontend.temporal.svc.cluster.local:7233"
+  TEMPORAL_NAMESPACE: "photovault"
+  TASK_QUEUE: "pv-image-processing"
+  AVIF_CONVERTER_URL: "http://pv-avif-converter-service.pv.svc.cluster.local:3000"
+  MINIO_ENDPOINT: "mjolnir"
+  MINIO_PORT: "9000"
+  MINIO_USE_SSL: "false"
+  MINIO_BUCKET_NAME: "photovault"

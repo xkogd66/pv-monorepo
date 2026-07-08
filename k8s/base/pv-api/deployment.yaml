@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pv-api
+  namespace: pv
+  labels:
+    app: pv-api
+spec:
+  replicas: 1
+  revisionHistoryLimit: 0 
+  selector:
+    matchLabels:
+      app: pv-api
+  template:
+    metadata:
+      labels:
+        app: pv-api
+    spec:
+      hostAliases:
+      - ip: "192.168.1.8"
+        hostnames:
+        - "mjolnir"
+      - ip: "192.168.1.10"
+        hostnames:
+        - "ubumac"  
+      containers:
+      - name: pv-api
+        image: ghcr.io/xkogd66/pv-api:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+        # Load config and secrets
+        envFrom:
+        - configMapRef:
+            name: pv-api-config
+        - secretRef:
+            name: pv-api-secret
+        volumeMounts:
+        - name: log-storage
+          mountPath: /app/logs
+        - name: nfs-vol
+          mountPath: /nfs-storage  # This is the "loading dock" for Temporal
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 120
+          periodSeconds: 3600        # Check once per hour
+          timeoutSeconds: 15         # Very generous
+          failureThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 7200        # Check every 2 hours
+          timeoutSeconds: 45
+          failureThreshold: 2
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
+      volumes:
+      - name: log-storage
+        emptyDir: {}
+      - name: nfs-vol
+        persistentVolumeClaim:
+          claimName: nfs-pv-claim # Ensure this PVC exists in 'pv' namespace

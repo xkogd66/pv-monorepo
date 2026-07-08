@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+Pillow
+pillow-heif
+python-multipart
+httpx
+minio

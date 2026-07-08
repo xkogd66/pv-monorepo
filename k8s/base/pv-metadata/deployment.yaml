@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pv-metadata
+  namespace: pv
+  labels:
+    app: pv-metadata
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pv-metadata
+  template:
+    metadata:
+      labels:
+        app: pv-metadata
+    spec:
+      containers:
+        - name: pv-metadata
+          image: ghcr.io/xkogd66/pv-metadata:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: pv-api-secret
+          env:
+            - name: MINIO_ENDPOINT
+              value: "192.168.1.8:9000"
+            - name: MINIO_BUCKET
+              value: "photovault"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 60
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"

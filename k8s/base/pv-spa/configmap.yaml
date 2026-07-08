@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pv-spa-config
+  namespace: pv
+  labels:
+    app: pv-spa
+    component: frontend
+data:
+  # Non-sensitive configuration values
+  APP_NAME: "EKSKOG PHOTOS"
+  APP_VERSION: "1.0.0"
+  NODE_ENV: "production"
+  
+  # UI Configuration
+  APP_TITLE: "EKSKOG PHOTOS"
+  APP_DESCRIPTION: "Secure Photo Gallery"
+  API_URL: "https://vault-api.ekskog.net"
+  
+  # Feature Flags
+  ENABLE_USER_MANAGEMENT: "true"
+  ENABLE_ALBUM_SHARING: "false"
+  ENABLE_PHOTO_COMMENTS: "false"
+  
+  # Performance Settings
+  MAX_UPLOAD_SIZE: "20485760"  # 10MB in bytes
+  THUMBNAIL_QUALITY: "80"
+  LAZY_LOADING: "true"
+  
+  # Debug Configuration (non-sensitive)
+  DEBUG_MODE: "false"  # Can be overridden in deployment
+  LOG_LEVEL: "info"    # error, warn, info, debug
+  
+  # Security Headers (non-sensitive)
+  SECURITY_HEADERS_ENABLED: "true"
+  CORS_ENABLED: "true"
+
+  # External Services
+  TURNSTILE_SITE_KEY: "0x4AAAAAABxuiZHUrM0VTikw"

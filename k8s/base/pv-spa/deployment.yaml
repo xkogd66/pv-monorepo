@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pv-spa
+  namespace: pv
+  labels:
+    app: pv-spa
+    component: client
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: pv-spa
+  template:
+    metadata:
+      labels:
+        app: pv-spa
+        component: client
+      annotations:
+        # This annotation will be updated by the CI/CD pipeline to force pod recreation
+        deployment.kubernetes.io/revision: "1"
+    spec:
+      containers:
+      - name: pv-spa
+        image: ghcr.io/xkogd66/pv-spa:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+          name: http
+        # Load runtime config from ConfigMap
+        envFrom:
+        - configMapRef:
+            name: pv-spa-config
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+            httpHeaders:
+            - name: User-Agent
+              value: "k8s-healthcheck"
+          initialDelaySeconds: 30
+          periodSeconds: 300
+          timeoutSeconds: 30
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+            httpHeaders:
+            - name: User-Agent
+              value: "k8s-healthcheck"
+          initialDelaySeconds: 5
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+      restartPolicy: Always

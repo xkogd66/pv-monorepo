@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pv-worker
+  namespace: pv
+  labels:
+    app: pv-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pv-worker
+  template:
+    metadata:
+      labels:
+        app: pv-worker
+    spec:
+      hostAliases:
+      - ip: "192.168.1.8"
+        hostnames:
+        - "mjolnir"
+      containers:
+      - name: worker
+        image: ghcr.io/xkogd66/pv-worker:latest
+        imagePullPolicy: Always
+        # --- ADDED PORT FOR HEALTH SERVER ---
+        ports:
+        - containerPort: 3000
+          name: health
+        # --- ADDED READINESS PROBE ---
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: health
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          failureThreshold: 3
+        env:
+        - name: TEMPORAL_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+              name: pv-worker-config
+              key: TEMPORAL_ADDRESS
+        - name: TEMPORAL_NAMESPACE
+          valueFrom:
+            configMapKeyRef:
+              name: pv-worker-config
+              key: TEMPORAL_NAMESPACE
+        - name: TASK_QUEUE
+          valueFrom:
+            configMapKeyRef:
+              name: pv-worker-config
+              key: TASK_QUEUE
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: pv-api-secret
+              key: MINIO_ACCESS_KEY
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: pv-api-secret
+              key: MINIO_SECRET_KEY
+        envFrom:
+        - configMapRef:
+            name: pv-worker-config
+        volumeMounts:
+        - name: nfs-storage
+          mountPath: /nfs-storage
+        # --- ADJUSTED RESOURCE LIMITS ---
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"    # High enough for raw pixel buffers
+            cpu: "1000m"    # 1 full core for faster encoding
+      volumes:
+      - name: nfs-storage
+        persistentVolumeClaim:
+          claimName: nfs-pv-claim
