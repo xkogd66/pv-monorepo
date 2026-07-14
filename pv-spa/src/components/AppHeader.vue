@@ -1,6 +1,6 @@
 <template>
   <header
-    class="relative flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200 shadow-sm"
+    class="sticky top-0 z-30 flex items-center justify-between h-16 px-6 bg-white border-b border-gray-200 shadow-sm"
   >
     <!-- Left: Logo or Hamburger -->
     <div class="flex items-center gap-4 relative">

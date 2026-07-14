@@ -6,6 +6,18 @@
 
 ---
 
+## Cluster Access
+
+Never run `kubectl` (or any other command that reads/touches the live K3s cluster) yourself. Always print the exact command and ask the user to run it and paste back the output. This applies to read-only commands (`kubectl get`, `describe`, `logs`) as well as mutating ones.
+
+---
+
+## Visual Verification
+
+Do not attempt to visually verify UI changes yourself (screenshots, headless browser driving, etc.). Make the code change, confirm it builds/typechecks, and then explicitly ask the user to check it in their own browser (dev server or real environment). Do not claim a UI change "looks correct" or "works" based on your own screenshot — you cannot see, and simulated verification is not a substitute for a human actually looking at it.
+
+---
+
 ## Repository Structure
 
 | Directory | Role | Language/Framework |

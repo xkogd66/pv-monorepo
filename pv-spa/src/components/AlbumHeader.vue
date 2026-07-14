@@ -1,5 +1,8 @@
 <template>
-  <div class="pb-3 sm:pb-5 border-b border-gray-200">
+  <div
+    class="sticky z-20 pt-2 pb-3 sm:pb-5 bg-gray-50 border-b border-gray-200"
+    :class="isPublic ? 'top-0' : 'top-16'"
+  >
 
     <!-- Row 1: back · title + count · actions -->
     <div class="flex items-center gap-2 mb-2 sm:mb-3">
