@@ -27,24 +27,22 @@ Do not attempt to visually verify UI changes yourself (screenshots, headless bro
 | `pv-converter/` | AVIF image conversion service | Python 3.11 / FastAPI |
 | `pv-metadata/` | EXIF extraction + album index writer (MinIO) | Python 3.11 / FastAPI |
 | `pv-temporal-worker/` | Async batch processing worker | TypeScript / Temporal SDK |
-| `pv-uploader/` | Simple web upload interface | Node.js / Express 4.x |
-| `pv_bulk_upload/` | CLI bulk upload tool | Node.js |
+| `pv_bulk_upload/` | CLI bulk upload tool — **currently broken**, see below | Node.js |
 | `k8s/` | Kubernetes manifests | YAML (base configs per service) |
 | `tools/` | Utility scripts | — |
+
+`pv_bulk_upload` targets `POST /buckets/:bucket/upload` and the `/processing-status/:jobId`
+SSE stream, both of which were removed with the legacy upload path. It needs to be
+repointed at `POST /bulk/upload/:folder` or deleted.
 
 ---
 
 ## Architecture
 
-```
-── Traditional upload ────────────────────────────────────────────
-Browser → pv-spa → pv-api
-                    │ (orchestrates)
-                    ├──→ pv-metadata ──→ MinIO  (writes <folder>.json)
-                    └──→ pv-converter ──→ MinIO  (writes AVIF)
-                    (both called in parallel)
+All uploads go through Temporal. There is no synchronous upload path.
 
-── Bulk upload ───────────────────────────────────────────────────
+```
+── Image upload ──────────────────────────────────────────────────
 Browser → pv-spa → pv-api
                     │ 1. stage files to NFS
                     │ 2. start Temporal workflow → 202
@@ -54,8 +52,11 @@ Browser → pv-spa → pv-api
                                         ├──→ pv-metadata ──→ MinIO
                                         ├──→ pv-converter ──→ MinIO
                                         ├──→ reportProgress ──→ pv-api POST /bulk/progress
-                                        │                           │ (SSE → browser)
+                                        │                           │ (stored; polled by SPA)
                                         └──→ cleanupBatch (NFS)
+
+── Video upload ──────────────────────────────────────────────────
+Browser → pv-spa → pv-api POST /video → Temporal (processVideoUpload)
 
 pv-api also serves:
   GET /bulk/status/:workflowId  (Temporal query)
@@ -66,11 +67,15 @@ Shared backing services (all flows):
 ```
 
 **Key communication patterns:**
-- **pv-api → pv-converter**: `POST /convert` (AVIF conversion)
-- **pv-api → pv-metadata**: `POST /extract` with the original file + converted `object_name`; pv-metadata extracts EXIF and **writes the result directly to MinIO** (`<folder>/<folder>.json`)
-- **pv-api → Temporal**: gRPC to start `processBatchImages` workflows
-- **pv-temporal-worker → pv-converter / MinIO**: direct HTTP + S3 API
-- **pv-api → browser**: Server-Sent Events (SSE) for real-time upload progress
+- **pv-temporal-worker → pv-converter**: `POST /convert` (AVIF conversion + WebP thumbnail)
+- **pv-temporal-worker → pv-metadata**: `POST /extract` with the original file + converted `object_name`; pv-metadata extracts EXIF and **writes the result directly to MinIO** (`<folder>/<folder>.json`)
+- **pv-api → Temporal**: gRPC to start `processBatchImages` / `processVideoUpload` workflows
+- **pv-temporal-worker → MinIO**: direct S3 API
+- **pv-api → browser**: the SPA polls `GET /bulk/progress/:id`; pv-api does not stream SSE
+
+pv-api does **not** extract EXIF or call pv-converter itself. It stages files and starts
+workflows. Do not reintroduce extraction into pv-api — the worker already calls pv-metadata,
+and a second extraction there is thrown away.
 
 ---
 
@@ -127,8 +132,7 @@ npm start        # run compiled JS
 - `server` — port 3000, environment
 - `cors` — allowlist: `photos.ekskog.me`, `localhost:5173`, Capacitor app origins
 - `temporal` — address, namespace, task queue, NFS path
-- `minio` — endpoint, port 9000, bucket name
-- `upload` — max file size 2 GB, allowed MIME types
+- `minio` — endpoint, port 9000, bucket name, public URL for presigning
 - `converter` — URL + 300s timeout
 - `metadata` — URL + 30s timeout
 - `auth` — JWT secret, 24h expiry
@@ -150,30 +154,26 @@ Non-sensitive vars live in ConfigMaps per service under `k8s/base/<service>/conf
 | GET | `/albums` | List albums |
 | POST | `/albums` | Create album |
 | DELETE | `/albums/:id` | Delete album |
-| POST | `/upload/:folder` | Single/multi file upload + AVIF conversion |
-| POST | `/bulk/upload/:folder` | Bulk upload → Temporal workflow (returns 202 + batchId) |
-| GET | `/bulk/status/:workflowId` | Poll bulk workflow progress |
+| POST | `/bulk/upload/:folder` | Image upload → Temporal workflow (returns 202 + batchId) |
+| POST | `/video/upload/:folder` | Video upload → Temporal workflow (returns 202 + batchId) |
+| GET | `/bulk/status/:workflowId` | Poll bulk workflow status |
+| GET | `/bulk/progress/:workflowId` | Poll bulk workflow progress |
+| POST | `/bulk/progress` | Progress callback from the worker |
 | GET | `/health` | Health check |
 | GET | `/stats` | Storage and photo statistics |
 
 ---
 
-## Upload Flows
+## Upload Flow (Temporal — the only path)
 
-### Traditional (small batches)
-1. Browser → `POST /upload/:folder`
-2. pv-api converts original file to AVIF → pv-converter
-3. pv-api stores converted AVIF in MinIO
-4. pv-api calls pv-metadata with the original file + AVIF `object_name`
-5. pv-metadata extracts EXIF, optionally reverse-geocodes, and upserts the image entry into `<folder>/<folder>.json` in MinIO
-6. SSE events stream progress to client
-
-### Bulk (Temporal async)
 1. Browser → `POST /bulk/upload/:folder` → 202 + batchId
 2. Files staged to `/nfs-storage/<batchId>`
 3. Temporal workflow `processBatchImages` started
-4. pv-temporal-worker processes sequentially (1 concurrent; 1 GB RAM limit)
-5. Client polls `GET /bulk/status/:workflowId` or uses SSE
+4. pv-temporal-worker processes sequentially (1 concurrent; 1 GB RAM limit), calling
+   pv-metadata then pv-converter per image
+5. Worker POSTs progress to `/bulk/progress`; the SPA polls `GET /bulk/progress/:workflowId`
+
+Videos follow the same shape via `POST /video/upload/:folder` → `processVideoUpload`.
 
 ---
 
@@ -208,10 +208,8 @@ All manifests live under `k8s/base/<service>/` with per-service:
 
 ## Testing
 
-Minimal test coverage today:
-- `pv-api`: test script is a placeholder (`echo "Error: no test specified"`)
-- `pv-spa`: `@playwright/test` is installed but no test files currently exist
-- Other services: no test setup
+No test suite in any service. Verification is integration testing against the running
+cluster.
 
 ---
 
@@ -290,8 +288,10 @@ All Cloudflare Tunnel routes are configured in the **Cloudflare dashboard** (not
 Thumbnails are pre-generated WebP files stored at `<album>/thumbs/<filename>.webp` in the `photovault` MinIO bucket. They are 400px wide, WebP quality 75.
 
 **How thumbnails are created:**
-- **New uploads**: `pv-converter` generates the WebP thumbnail from the source image (JPEG/HEIC) using Pillow before freeing source bytes, then uploads it to `<album>/thumbs/<filename>.webp`. This runs for both traditional and Temporal bulk uploads since both go through pv-converter.
-- **Existing images**: `tools/generate-thumbs.js` — run locally with MinIO credentials. Idempotent (skips existing thumbs). Supports `--album <name>` to process a single album. Credentials: `MINIO_ACCESS_KEY=lucarv MINIO_SECRET_KEY=<secret>`.
+- **New uploads**: `pv-converter` generates the WebP thumbnail from the source image (JPEG/HEIC) using Pillow (`ImageOps.exif_transpose()` is applied first to correct EXIF orientation before resizing) before freeing source bytes, then uploads it to `<album>/thumbs/<filename>.webp`. Every upload goes through pv-converter.
+- **Existing images**: there is no backfill script any more. `tools/generate-thumbs.js` was
+  removed once pv-converter started generating thumbnails on every upload. If a backfill is
+  ever needed again, recover it from git history rather than rewriting it.
 
 **How thumbnails are served:**
 - `pv-api` `getPhotos` generates a presigned URL for `<album>/thumbs/<filename>.webp` and returns it as `thumbnailUrl`.
@@ -306,8 +306,7 @@ Thumbnails are pre-generated WebP files stored at `<album>/thumbs/<filename>.web
 The `albums.counter` column in MariaDB caches the photo count per album and is used by `GET /albums` to avoid N MinIO list calls.
 
 **How it is maintained:**
-- Traditional upload (`server.js`): incremented by the number of successfully processed files after the upload completes.
-- Bulk upload (`temporalUploads.js`): incremented when a `reportProgress` POST arrives with `state === 'complete'`.
+- Bulk upload (`temporalUploads.js`): incremented when a `reportProgress` POST arrives with `state === 'complete'`. This is the only place the counter is incremented.
 - Delete (`albums.js`): decremented by 1 per deleted object.
 
 **Known limitation:** Re-uploading the same files overwrites the MinIO objects silently but still increments the counter, causing drift. If counters look wrong, run the audit+fix script (counts actual `.avif/.jpg/.mp4` objects in MinIO per album prefix and resets the DB counter to match).

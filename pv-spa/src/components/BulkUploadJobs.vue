@@ -93,65 +93,6 @@
         </div>
       </article>
 
-      <!--  Hide Legacy
-      <article class="rounded-xl border border-gray-200 bg-white p-4 md:p-5 min-h-[30rem]">
-        <div class="flex items-center justify-between gap-3">
-          <div>
-            <h3 class="text-base font-semibold text-gray-900">Non-Bulk Live SSE</h3>
-            <p class="mt-1 text-sm text-gray-600">Latest non-bulk uploads for this browser session, with ongoing jobs highlighted.</p>
-          </div>
-        </div>
-
-        <div class="mt-4 flex flex-wrap gap-2">
-          <span class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
-            Live SSE jobs: {{ legacyRunningCount }}
-          </span>
-          <span class="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700">
-            Session total: {{ legacyUploads.length }}
-          </span>
-        </div>
-
-        <div v-if="legacyUploads.length === 0" class="mt-4 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-sm text-gray-500">
-          No non-bulk SSE uploads in this session yet.
-        </div>
-
-        <div v-else class="mt-4 max-h-[22rem] overflow-y-auto pr-1 space-y-4">
-          <section>
-            <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-blue-700">Ongoing</div>
-            <div v-if="legacyOngoingUploads.length === 0" class="rounded-lg border border-dashed border-blue-200 bg-blue-50 px-4 py-4 text-sm text-blue-700">
-              No ongoing non-bulk uploads right now.
-            </div>
-            <div v-else class="space-y-3">
-              <div
-                v-for="job in legacyOngoingUploads"
-                :key="`ongoing-${job.id}`"
-                class="rounded-xl border-2 border-blue-300 bg-blue-50/40 p-1"
-              >
-                <UploadProgress :job="job" />
-              </div>
-            </div>
-          </section>
-
-          <section>
-            <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-700">Latest In This Session</div>
-            <div class="space-y-3">
-              <div
-                v-for="job in latestLegacySessionUploads"
-                :key="`latest-${job.id}`"
-                :class="[
-                  'rounded-xl border p-1',
-                  isTerminalUploadStatus(job.status)
-                    ? 'border-gray-200 bg-gray-50/40'
-                    : 'border-blue-200 bg-blue-50/30'
-                ]"
-              >
-                <UploadProgress :job="job" />
-              </div>
-            </div>
-          </section>
-        </div>
-      </article>
-    -->
     </section>
   </div>
 </template>
@@ -159,8 +100,6 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import apiService from '../services/api.js';
-import UploadProgress from './UploadProgress.vue';
-import { useUploadMonitor, isTerminalUploadStatus } from '../services/uploadMonitor.js';
 
 const jobs = ref([]);
 const loading = ref(false);
@@ -170,24 +109,6 @@ const progressMap = ref({});
 
 let progressInterval = null;
 let jobsInterval = null;
-
-const { jobs: trackedUploads } = useUploadMonitor();
-
-const legacyUploads = computed(() =>
-  Object.values(trackedUploads)
-    .filter((job) => job.kind === 'legacy')
-    .sort((left, right) => new Date(right.updatedAt || 0) - new Date(left.updatedAt || 0))
-);
-
-const legacyRunningCount = computed(() =>
-  legacyUploads.value.filter((job) => !isTerminalUploadStatus(job.status)).length
-);
-
-const legacyOngoingUploads = computed(() =>
-  legacyUploads.value.filter((job) => !isTerminalUploadStatus(job.status))
-);
-
-const latestLegacySessionUploads = computed(() => legacyUploads.value.slice(0, 8));
 
 const temporalRunningCount = computed(() => jobs.value.filter((job) => job.status === 'RUNNING').length);
 const temporalCompletedCount = computed(() => jobs.value.filter((job) => job.status === 'COMPLETED').length);
@@ -227,7 +148,7 @@ const loadProgressForRunningJobs = async () => {
         console.log('[BulkUploadJobs] fetching progress for batchId=', job.batchId);
         const res = await apiService.getBulkJobProgress(job.batchId);
                 if (res && res.progress) {
-                  // Normalize progress shapes between Temporal and legacy SSE polling
+                  // Normalize progress shapes returned by the Temporal progress query
                   const p = res.progress;
                   const totalVal = (p.totalRequested ?? p.total) || 1;
                   const processedVal = p.processed ?? p.current ?? 0;

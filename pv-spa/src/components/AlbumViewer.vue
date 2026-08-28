@@ -205,7 +205,7 @@ const preloadStats = ref({
 const progressTracker = ref(null);
 // Toasts
 const { toasts, showToast } = useToast();
-const { jobs: trackedUploads, registerLegacyUpload, registerBulkUpload } = useUploadMonitor();
+const { jobs: trackedUploads, registerBulkUpload } = useUploadMonitor();
 const handledAlbumCompletions = new Set();
 
 // NEW: Sort order state
@@ -291,14 +291,6 @@ const handleJobReady = (payload) => {
     registerBulkUpload({
       workflowId: payload.workflowId,
       batchId: payload.batchId,
-      albumName: props.albumName,
-    });
-    return;
-  }
-
-  if (payload?.jobId) {
-    registerLegacyUpload({
-      jobId: payload.jobId,
       albumName: props.albumName,
     });
   }

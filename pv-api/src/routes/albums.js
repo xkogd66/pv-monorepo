@@ -1,38 +1,16 @@
 // routes/albums.js
 const express = require("express");
 const router = express.Router();
-const multer = require("multer");
-const os = require("os");
-const path = require("path");
-const { v4: uuidv4 } = require("uuid");
 const { authenticateToken, requireRole } = require("../middleware/authMW");
 
 const database = require("../services/database-service");
-const MetadataService = require("../services/metadata-service");
+const { getAddressFromCoordinates } = require("../services/metadata-service");
 
 const config = require("../config");
 
 const debug = require("debug");
 const debugAlbum = debug("pv:album");
 const debugUpload = debug("pv:upload");
-
-// Configure multer for file uploads (store temporarily on disk to avoid OOM)
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, os.tmpdir());
-  },
-  filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${file.originalname}`;
-    cb(null, uniqueName);
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: {
-    fileSize: 2 * 1024 * 1024 * 1024, // 2GB limit for large video files
-  },
-});
 
 function normalizeFolderPath(input) {
   if (typeof input !== "string") return "";
@@ -379,63 +357,6 @@ const getObject = (minioClient) => async (req, res) => {
   }
 };
 
-// POST /buckets/:bucketName/upload - Upload files to a bucket
-const uploadFiles = (pendingJobs) => async (req, res) => {
-  try {
-    const { folderPath = "" } = req.body;
-    const files = req.files;
-
-    if (!files || files.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: "No files provided",
-      });
-    }
-
-    const jobId = uuidv4(); // Generate unique job ID for this upload
-    debugUpload(`Upload request received for ${files.length} files to folder: ${folderPath} with jobId: ${jobId}`);
-
-    // Store job for when SSE connection is established
-    const jobData = {
-      files,
-      bucketName: config.minio.bucketName,
-      folderPath,
-      timestamp: new Date().toISOString(),
-    };
-
-    pendingJobs.set(jobId, jobData);
-    debugUpload(`Stored pending job ${jobId} with ${files.length} files`);
-
-    const response = {
-      success: true,
-      message: "Files received successfully. Connect to SSE endpoint to start processing.",
-      data: {
-        bucket: config.minio.bucketName,
-        folderPath: folderPath || "/",
-        filesReceived: files.length,
-        status: "received",
-        jobId: jobId, // Return the job ID to the client
-        timestamp: jobData.timestamp,
-      },
-    };
-
-    res.status(200).json(response);
-
-    // Set timeout to clean up if client never connects
-    setTimeout(() => {
-      if (pendingJobs.has(jobId)) {
-        debugUpload(`Cleaning up expired pending job ${jobId}`);
-        pendingJobs.delete(jobId);
-      }
-    }, 60000); // 60 seconds timeout
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-};
-
 // DELETE /buckets/:bucketName/objects - Delete objects from a bucket
 const deleteObjects = (minioClient) => async (req, res) => {
   const folderPath = req.params.folderPath;
@@ -535,8 +456,6 @@ const updatePhotoMetadata = (minioClient) => async (req, res) => {
       });
     }
 
-    const metadataService = new MetadataService(minioClient);
-
     debugAlbum(
       `Updating metadata for ${folderPath}/${objectName} with data: ${JSON.stringify(
         metadata
@@ -545,8 +464,7 @@ const updatePhotoMetadata = (minioClient) => async (req, res) => {
 
     // If coordinates are provided, attempt to find address (non-blocking)
     if (metadata.coordinates) {
-      await metadataService
-        .getAddressFromCoordinates(metadata.coordinates)
+      await getAddressFromCoordinates(metadata.coordinates)
         .then((address) => {
           metadata.location = address;
           debugAlbum(`[albums.js (379)] METADATA ${JSON.stringify(metadata)}`);
@@ -813,18 +731,11 @@ const renameAlbum = (minioClient) => async (req, res) => {
 };
 
 // Consolidate the module.exports into a single export
-module.exports = (minioClient, { pendingJobs, processFilesInBackground, publicMinioClient = null }) => {
+module.exports = (minioClient, { publicMinioClient = null } = {}) => {
   router.get("/albums", getAlbums(minioClient));
   router.get("/album/:name", getPhotos(minioClient, publicMinioClient));
   router.get("/objects/:name", getPhotos(minioClient, publicMinioClient));
   router.get("/albums/:name/object/:object", getObject(minioClient));
-  router.post(
-    "/buckets/:bucketName/upload",
-    authenticateToken,
-    requireRole("admin"),
-    upload.array("files"),
-    uploadFiles(pendingJobs)
-  );
   router.delete(
     "/buckets/:bucketName/folders",
     authenticateToken,

@@ -3,7 +3,7 @@ FROM python:3.11-alpine
 
 WORKDIR /app
 
-# Install the latest conversion tools + build dependencies for psutil
+# Install the latest conversion tools + toolchain for building Python wheels on musl
 RUN apk add --no-cache \
     libheif-tools \
     libavif-apps \

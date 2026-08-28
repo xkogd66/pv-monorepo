@@ -8,9 +8,6 @@ export interface MetadataResult {
   filename: string;
   success: boolean;
   objectName: string;
-  metrics: {
-    metadataTimeMs: number | null;
-  };
 }
 
 /**
@@ -45,17 +42,9 @@ export async function extractAndPersistMetadata(
 
   const result = await response.json() as { status: string; object_name: string };
 
-  // console.log(`[metadataActivity] ✓ Metadata extracted and written to MinIO for ${filename}`);
-
-  const metadataTimeMs = Date.now() - (response?.headers?.get('x-start-ts') ? Number(response.headers.get('x-start-ts')) : 0);
-
   return {
     filename,
     success: true,
     objectName: result.object_name,
-    // include basic timing so workflows can compute averages
-    metrics: {
-      metadataTimeMs: metadataTimeMs > 0 ? metadataTimeMs : null,
-    },
   };
 }
