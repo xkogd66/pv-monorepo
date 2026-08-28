@@ -126,6 +126,20 @@ async request(endpoint, options = {}) {
     });
   }
 
+  // Update an album's details (name, description, month, year). Only the fields
+  // present in `changes` are sent; the API falls back to existing values.
+  async updateAlbum(currentName, changes = {}) {
+    const body = {};
+    if (changes.newName !== undefined) body.newName = changes.newName;
+    if (changes.description !== undefined) body.description = changes.description;
+    if (changes.month !== undefined) body.month = changes.month;
+    if (changes.year !== undefined) body.year = changes.year;
+    return this.request(`/album/${encodeURIComponent(currentName)}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    });
+  }
+
   async deleteFolder(bucketName, folderPath) {
     return this.request(`/buckets/${bucketName}/folders`, {
       method: "DELETE",

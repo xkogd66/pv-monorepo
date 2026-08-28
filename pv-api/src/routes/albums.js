@@ -33,6 +33,8 @@ const getAlbums = (minioClient) => async (req, res) => {
     const albumMetadata = albums.map((album) => ({
       ...album,
       fileCount: album.counter || 0,
+      year: album.year ?? null,
+      month: album.month ?? null,
     }));
     res.json({ success: true, albums: albumMetadata });
   } catch (error) {
@@ -558,21 +560,11 @@ const updatePhotoMetadata = (minioClient) => async (req, res) => {
   }
 };
 
-// PUT /album/:currentName - Rename an album (Admin only)
+// PUT /album/:currentName - Update an album (rename and/or edit metadata) (Admin only)
 const renameAlbum = (minioClient) => async (req, res) => {
   try {
     const { currentName } = req.params;
-    const { newName } = req.body;
-
-    if (!newName || !newName.trim()) {
-      return res.status(400).json({
-        success: false,
-        error: "New album name is required",
-      });
-    }
-
-    const cleanNewName = newName.trim();
-    const newNormalizedPath = `${cleanNewName}/`;
+    const { newName, description, month, year } = req.body;
 
     // Check if album exists
     const album = await database.getAlbumByName(currentName);
@@ -582,6 +574,46 @@ const renameAlbum = (minioClient) => async (req, res) => {
         error: "Album not found",
       });
     }
+
+    // Normalize editable fields; fall back to existing values for anything not sent.
+    const cleanNewName =
+      typeof newName === "string" && newName.trim() ? newName.trim() : currentName;
+    const isRename = cleanNewName !== currentName;
+    const normalizeInt = (value) => {
+      if (value === undefined || value === null || value === "") return null;
+      const n = parseInt(value, 10);
+      return Number.isNaN(n) ? null : n;
+    };
+    const nextDescription = description !== undefined ? description : album.description;
+    const nextMonth = month !== undefined ? normalizeInt(month) : album.month;
+    const nextYear = year !== undefined ? normalizeInt(year) : album.year;
+
+    if (!isRename) {
+      // Metadata-only update — no storage movement required.
+      const updateResult = await database.updateAlbumDescription(album.id, {
+        description: nextDescription,
+        month: nextMonth,
+        year: nextYear,
+      });
+      if (!updateResult) {
+        return res.status(500).json({
+          success: false,
+          error: "Failed to update album in database",
+        });
+      }
+      return res.status(200).json({
+        success: true,
+        message: `Album '${currentName}' updated successfully`,
+        data: {
+          name: currentName,
+          description: nextDescription,
+          month: nextMonth,
+          year: nextYear,
+        },
+      });
+    }
+
+    const newNormalizedPath = `${cleanNewName}/`;
 
     // Check if new name already exists
     const existingAlbum = await database.getAlbumByName(cleanNewName);
@@ -682,11 +714,13 @@ const renameAlbum = (minioClient) => async (req, res) => {
         }
       );
 
-      // 7. Update database
+      // 7. Update database (carry over any edited metadata)
       const updateResult = await database.updateAlbumDescription(album.id, {
         name: cleanNewName,
         path: newNormalizedPath,
-        description: album.description, // Keep existing description
+        description: nextDescription,
+        month: nextMonth,
+        year: nextYear,
       });
 
       if (!updateResult) {

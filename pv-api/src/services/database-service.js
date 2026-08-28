@@ -345,7 +345,7 @@ class Database {
     const connection = await this.pool.getConnection();
     try {
       const [rows] = await connection.execute(
-        "SELECT name, slug, path, description, counter, created_at, updated_at FROM albums ORDER BY created_at DESC"
+        "SELECT name, slug, path, description, counter, year, month, created_at, updated_at FROM albums ORDER BY created_at DESC"
       );
       return rows;
     } finally {
@@ -354,7 +354,7 @@ class Database {
   }
 
   // Update album
-  async updateAlbumDescription(albumId, { name, path, description }) {
+  async updateAlbumDescription(albumId, { name, path, description, month, year }) {
     const connection = await this.pool.getConnection();
     try {
       // If name is being updated, we might want to update the slug too
@@ -375,6 +375,16 @@ class Database {
       if (description !== undefined) {
         updateQuery += ", description = ?";
         params.push(description);
+      }
+
+      if (month !== undefined) {
+        updateQuery += ", month = ?";
+        params.push(month);
+      }
+
+      if (year !== undefined) {
+        updateQuery += ", year = ?";
+        params.push(year);
       }
 
       updateQuery += " WHERE id = ?";

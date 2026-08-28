@@ -9,7 +9,7 @@
         <button 
           v-if="canRename" 
           @click.stop="$emit('rename', album)" 
-          title="Rename Album"
+          title="Edit Album"
           class="w-8 h-8 bg-white/95 backdrop-blur-sm text-gray-700 rounded-full shadow-md hover:bg-blue-500 hover:text-white transition-all flex items-center justify-center"
         >
           <i class="fas fa-edit text-sm"></i>
@@ -30,7 +30,10 @@
           <i class="fas fa-images"></i>
         </div>
         <h3 class="text-base font-semibold text-gray-900 mb-2">{{ displayName }}</h3>
-        <p class="text-sm text-gray-600 mb-1">{{ album.fileCount || 0 }} photos</p>
+        <p class="text-sm text-gray-600 mb-1">
+          {{ album.fileCount || 0 }} photos
+          <span v-if="album.year" class="ml-2 inline-block bg-blue-50 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">{{ album.year }}</span>
+        </p>
         <p class="text-xs text-gray-400">{{ formattedDate }}</p>
       </div>
     </div>

@@ -6,6 +6,19 @@
       <div class="flex items-center gap-3 flex-wrap">
         <!-- Sort Controls (only show when albums exist) -->
         <div v-if="!loading && !error && albums.length > 0" class="flex items-center gap-2 flex-wrap">
+          <!-- Year filter dropdown -->
+          <div v-if="availableYears.length > 0" class="flex items-center gap-2">
+            <span class="text-sm text-gray-600 hidden sm:inline">Year:</span>
+            <select
+              v-model="selectedYear"
+              title="Filter albums by year"
+              class="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+            >
+              <option :value="null">All years</option>
+              <option v-for="y in availableYears" :key="y" :value="y">{{ y }}</option>
+            </select>
+          </div>
+
           <span class="text-sm text-gray-600 hidden sm:inline">Sort by:</span>
 
           <!-- Date sorting buttons -->
@@ -78,16 +91,23 @@
           :can-rename="canRenameAlbum"
           :can-delete="canDeleteAlbum"
           @click="openAlbum"
-          @rename="confirmRename"
+          @rename="openEditDialog"
           @delete="confirmDelete"
         />
-        <!-- Empty State -->
-        <div v-if="albums.length === 0" class="col-span-full text-center py-16 px-8">
+        <!-- Empty State (no albums at all, or no albums match the active year filter) -->
+        <div v-if="albums.length === 0 || (selectedYear != null && filteredAlbums.length === 0)" class="col-span-full text-center py-16 px-8">
           <div class="text-5xl mb-4 text-gray-400"><i class="fas fa-camera"></i></div>
-          <h3 class="text-xl text-gray-800 mb-4">No Albums Yet</h3>
+          <h3 class="text-xl text-gray-800 mb-4">
+            {{ selectedYear != null && filteredAlbums.length === 0 ? `No Albums in ${selectedYear}` : 'No Albums Yet' }}
+          </h3>
           <p class="text-gray-600 mb-6">
-            <span v-if="canCreateAlbum">Create your first photo album to get started!</span>
-            <span v-else>No albums available to view.</span>
+            <template v-if="selectedYear != null && filteredAlbums.length === 0">
+              No albums match this year. Try another year or clear the filter.
+            </template>
+            <template v-else>
+              <span v-if="canCreateAlbum">Create your first photo album to get started!</span>
+              <span v-else>No albums available to view.</span>
+            </template>
           </p>
           <button v-if="canCreateAlbum" @click="showCreateDialog = true"
             class="bg-blue-500 text-white px-6 py-3 rounded-md text-sm font-semibold shadow-md transition hover:bg-blue-600">
@@ -149,26 +169,56 @@
       </div>
     </div>
 
-    <!-- Rename Album Dialog -->
-    <div v-if="showRenameDialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1000]"
-      @click="closeRenameDialog">
+    <!-- Edit Album Dialog -->
+    <div v-if="showEditDialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1000]"
+      @click="closeEditDialog">
       <div class="bg-white rounded-xl p-8 w-full max-w-md shadow-xl mx-4" @click.stop>
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">Rename Album</h3>
-        <p class="mb-4">Enter a new name for the album "<strong>{{ getAlbumDisplayName(albumToRename?.name) }}</strong>".</p>
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">Edit Album</h3>
+        <p class="mb-4">Edit "<strong>{{ getAlbumDisplayName(albumToEdit?.name) }}</strong>".</p>
         <div class="mb-6">
-          <label for="renameAlbumName" class="block mb-2 font-medium text-gray-800">New Album Name:</label>
-          <input id="renameAlbumName" v-model="newAlbumNameForRename" type="text" placeholder="Enter new album name..."
-            @keyup.enter="renameAlbum" ref="renameAlbumNameInput"
+          <label for="editAlbumName" class="block mb-2 font-medium text-gray-800">Album Name:</label>
+          <input id="editAlbumName" v-model="editAlbumName" type="text" placeholder="Enter album name..."
+            @keyup.enter="saveAlbum" ref="editAlbumNameInput"
+            class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
+        </div>
+        <div class="mb-6">
+          <label for="editAlbumDescription" class="block mb-2 font-medium text-gray-800">Description (optional):</label>
+          <textarea id="editAlbumDescription" v-model="editAlbumDescription" placeholder="Enter album description..."
+            rows="3"
+            class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 resize-none"></textarea>
+        </div>
+        <div class="mb-6">
+          <label for="editAlbumMonth" class="block mb-2 font-medium text-gray-800">Month:</label>
+          <select id="editAlbumMonth" v-model="editAlbumMonth"
+            class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
+            <option value="">Select month...</option>
+            <option value="01">January</option>
+            <option value="02">February</option>
+            <option value="03">March</option>
+            <option value="04">April</option>
+            <option value="05">May</option>
+            <option value="06">June</option>
+            <option value="07">July</option>
+            <option value="08">August</option>
+            <option value="09">September</option>
+            <option value="10">October</option>
+            <option value="11">November</option>
+            <option value="12">December</option>
+          </select>
+        </div>
+        <div class="mb-6">
+          <label for="editAlbumYear" class="block mb-2 font-medium text-gray-800">Year:</label>
+          <input id="editAlbumYear" v-model="editAlbumYear" type="number" placeholder="Enter year (e.g., 2025)" min="1900" max="2100"
             class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
         </div>
         <div class="flex justify-end gap-4 flex-wrap sm:flex-nowrap">
-          <button @click="closeRenameDialog"
+          <button @click="closeEditDialog"
             class="bg-gray-100 text-gray-800 border border-gray-300 px-4 py-3 rounded-md text-sm transition hover:bg-gray-200 min-w-[80px]">
             Cancel
           </button>
-          <button @click="renameAlbum" :disabled="!newAlbumNameForRename.trim() || renaming || newAlbumNameForRename.trim() === albumToRename?.name"
+          <button @click="saveAlbum" :disabled="!editAlbumName.trim() || saving"
             class="bg-blue-500 text-white px-4 py-3 rounded-md text-sm font-semibold shadow-md transition hover:bg-blue-600 disabled:opacity-60 disabled:cursor-not-allowed min-w-[120px]">
-            {{ renaming ? 'Renaming...' : 'Rename Album' }}
+            {{ saving ? 'Saving...' : 'Save Changes' }}
           </button>
         </div>
       </div>
@@ -192,20 +242,40 @@ const error = ref(null)
 const albums = ref([])
 const showCreateDialog = ref(false)
 const showDeleteDialog = ref(false)
-const showRenameDialog = ref(false)
-const newAlbumNameForRename = ref('')
+const showEditDialog = ref(false)
+const editAlbumName = ref('')
+const editAlbumDescription = ref('')
+const editAlbumMonth = ref('')
+const editAlbumYear = ref('')
 const creating = ref(false)
 const deleting = ref(false)
-const renaming = ref(false)
+const saving = ref(false)
 const albumToDelete = ref(null)
-const albumToRename = ref(null)
-const renameAlbumNameInput = ref(null)
+const albumToEdit = ref(null)
+const editAlbumNameInput = ref(null)
 const sortOrder = ref('date-desc')
+const selectedYear = ref(null)
 const currentPage = ref(1)
 const itemsPerPage = ref(24)
-// Computed property for sorted albums
+// Distinct years across all albums (most recent first) — drives the year filter dropdown
+const availableYears = computed(() => {
+  const years = new Set(
+    albums.value
+      .map((album) => album.year)
+      .filter((y) => typeof y === 'number' && Number.isInteger(y))
+  );
+  return [...years].sort((a, b) => b - a);
+});
+
+// Albums filtered by the selected year (null = all years)
+const filteredAlbums = computed(() => {
+  if (selectedYear.value == null) return albums.value;
+  return albums.value.filter((album) => album.year === selectedYear.value);
+});
+
+// Computed property for sorted albums (sorts within the year-filtered set)
 const sortedAlbums = computed(() => {
-  return [...albums.value].sort((a, b) => {
+  return [...filteredAlbums.value].sort((a, b) => {
     switch (sortOrder.value) {
       case 'date-desc':
         if (!a.lastModified) return 1
@@ -269,6 +339,10 @@ const loadAlbums = async () => {
             ? new Date(album.updated_at).toISOString() 
             : null,
           fileCount: album.fileCount ?? 0,
+          year: album.year ?? null,
+          month: album.month ?? null,
+          description: album.description ?? '',
+
         }
       })
 
@@ -348,37 +422,47 @@ const deleteAlbum = async () => {
   }
 }
 
-const confirmRename = (album) => {
+const openEditDialog = (album) => {
   if (!authService.canPerformAction('delete_album')) {
-    error.value = 'You do not have permission to rename albums'
+    error.value = 'You do not have permission to edit albums'
     return
   }
 
-  albumToRename.value = album
-  newAlbumNameForRename.value = album.name
-  showRenameDialog.value = true
+  albumToEdit.value = album
+  editAlbumName.value = album.name
+  editAlbumDescription.value = album.description || ''
+  editAlbumMonth.value = album.month ? String(album.month).padStart(2, '0') : ''
+  editAlbumYear.value = album.year ? String(album.year) : ''
+  showEditDialog.value = true
 }
 
-const renameAlbum = async () => {
-  if (!albumToRename.value || !newAlbumNameForRename.value.trim()) return
+const saveAlbum = async () => {
+  if (!albumToEdit.value || !editAlbumName.value.trim()) return
 
-  renaming.value = true
+  saving.value = true
   error.value = null
 
   try {
-    const response = await apiService.renameFolder(albumToRename.value.name, newAlbumNameForRename.value.trim())
+    const changes = {
+      newName: editAlbumName.value.trim(),
+      description: editAlbumDescription.value.trim() || null,
+      month: editAlbumMonth.value ? parseInt(editAlbumMonth.value, 10) : null,
+      year: editAlbumYear.value ? parseInt(editAlbumYear.value, 10) : null,
+    }
+
+    const response = await apiService.updateAlbum(albumToEdit.value.name, changes)
 
     if (response.success) {
       await loadAlbums()
-      closeRenameDialog()
+      closeEditDialog()
     } else {
-      throw new Error(response.error || 'Failed to rename album')
+      throw new Error(response.error || 'Failed to update album')
     }
   } catch (err) {
     console.error('[ALBUMS ERROR]', err)
-    error.value = `Failed to rename album: ${err.message}`
+    error.value = `Failed to update album: ${err.message}`
   } finally {
-    renaming.value = false
+    saving.value = false
   }
 }
 
@@ -392,11 +476,14 @@ const closeDeleteDialog = () => {
   deleting.value = false
 }
 
-const closeRenameDialog = () => {
-  showRenameDialog.value = false
-  albumToRename.value = null
-  newAlbumNameForRename.value = ''
-  renaming.value = false
+const closeEditDialog = () => {
+  showEditDialog.value = false
+  albumToEdit.value = null
+  editAlbumName.value = ''
+  editAlbumDescription.value = ''
+  editAlbumMonth.value = ''
+  editAlbumYear.value = ''
+  saving.value = false
 }
 
 const getAlbumDisplayName = (folderName) => {
@@ -413,21 +500,25 @@ const goToPage = (page) => {
   }
 }
 
-const focusRenameInput = async () => {
+const focusEditInput = async () => {
   await nextTick()
-  if (renameAlbumNameInput.value) {
-    renameAlbumNameInput.value.focus()
-    renameAlbumNameInput.value.select()
+  if (editAlbumNameInput.value) {
+    editAlbumNameInput.value.focus()
+    editAlbumNameInput.value.select()
   }
 }
 
-watch(showRenameDialog, (newVal) => {
+watch(showEditDialog, (newVal) => {
   if (newVal) {
-    focusRenameInput()
+    focusEditInput()
   }
 })
 
 watch(sortOrder, () => {
+  currentPage.value = 1
+})
+
+watch(selectedYear, () => {
   currentPage.value = 1
 })
 
