@@ -152,21 +152,29 @@ async function startServer() {
     app.use("/user", userRoutes);
     app.use("/", albumRoutes(minioClient, { publicMinioClient }));
     app.use("/", statRoutes(minioClient));
-
-    const deps = await healthRoutes.checkAllDependencies(minioClient, temporalClient);
-    debugServer("Dependency status at startup: ", deps);
-    require("./services/dependency-status").set(deps);
-
     app.use("/bulk", temporalRoutes(getTemporalClient, config, { persistProgress, getProgress }));
     app.use("/video", videoUploadRoutes(minioClient, { getTemporalClient }));
     app.use("/", healthRoutes(minioClient, temporalClient));
 
-    //debugServer(`[server.js] Database initialized successfully`);
-    // Start HTTP server
+    // Listen BEFORE probing dependencies. The probe is informational — it only
+    // populates `startupDependencies` in the /health payload — but the converter
+    // check alone can take 30 s. Awaiting it here would delay the open port past
+    // readinessProbe.initialDelaySeconds (30 s), and periodSeconds is 7200, so a
+    // single missed probe parks the pod outside the Service for two hours.
     app.listen(PORT, () => {
       debugServer(`Starting pv ${new Date()}...`);
       debugServer(`> pv API server running on port ${config.server.port}`);
     });
+
+    healthRoutes
+      .checkAllDependencies(minioClient, temporalClient)
+      .then((deps) => {
+        debugServer("Dependency status at startup: ", deps);
+        require("./services/dependency-status").set(deps);
+      })
+      .catch((err) => {
+        debugServer("Startup dependency check failed:", err.message);
+      });
   } catch (error) {
     //debugServer(`[server.js] Failed to start server:`, error.message);
     process.exit(1);

@@ -82,9 +82,13 @@ class ConfigService {
     const testUrl = url || this.getApiUrl()
 
     try {
+      // pv-api's /health probes the converter with a 30 s cap, and the converter
+      // blocks on a sync subprocess while encoding — so a healthy system can take
+      // ~30 s to answer during a bulk upload. Abort above that, not below it, or
+      // this reports a false failure exactly when uploads are running.
       const response = await fetch(`${testUrl}/health`, {
         method: 'GET',
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(35000),
       })
 
       return {
