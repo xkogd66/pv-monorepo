@@ -13,12 +13,6 @@ class ApiService {
     return configService.getApiUrl();
   }
 
-  // Get SSE URL for processing status
-  getProcessingStatusUrl(jobId) {
-    const API_BASE_URL = this.getApiBaseUrl();
-    return `${API_BASE_URL}/processing-status/${jobId}`;
-  }
-
   // Set auth service reference (to avoid circular imports)
   setAuthService(authService) {
     this.authService = authService;
@@ -28,12 +22,6 @@ class ApiService {
   getBulkUploadUrl(folder) {
     const API_BASE_URL = this.getApiBaseUrl();
     return `${API_BASE_URL}/bulk/upload/${encodeURIComponent(folder)}`;
-  }
-
-  // Build bulk workflow status URL
-  getBulkWorkflowStatusUrl(workflowId) {
-    const API_BASE_URL = this.getApiBaseUrl();
-    return `${API_BASE_URL}/bulk/status/${encodeURIComponent(workflowId)}`;
   }
 
   // API convention: workflow id is derived from batch id
@@ -47,11 +35,6 @@ class ApiService {
   }
 
 async request(endpoint, options = {}) {
-  // Debug: inspect configService + API URL
-  console.log("🔧 apiService.request called");
-  console.log("  endpoint:", endpoint);
-
-
   const API_BASE_URL = this.getApiBaseUrl();
   const url = `${API_BASE_URL}${endpoint}`;
 
@@ -73,15 +56,12 @@ async request(endpoint, options = {}) {
     ...options,
   };
 
-  console.log("  Fetch config:", config);
-
   try {
     const response = await fetch(url, config);
-    console.log("  Response:", response.status);
 
     // Handle 401 Unauthorized - token might be expired
     if (response.status === 401) {
-      console.warn("⚠️ Authentication failed (401) – clearing tokens");
+      console.warn("Authentication failed (401) – clearing tokens");
 
       // Clear invalid token
       localStorage.removeItem("hbvu_auth_token");
@@ -89,7 +69,6 @@ async request(endpoint, options = {}) {
 
       // Clear auth service state if available
       if (this.authService) {
-        console.log("  Clearing authService state");
         this.authService.clearAuth();
       }
 

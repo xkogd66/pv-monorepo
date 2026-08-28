@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const { nanoid } = require('nanoid');
+const { randomUUID } = require('crypto');
 const fs = require('fs').promises;
 const path = require('path');
 const { authenticateToken, requireRole } = require('../middleware/authMW');
@@ -13,7 +13,7 @@ const debugVideo = debug('pv:video');
 module.exports = (minioClient, { getTemporalClient } = {}) => {
   const videoStorage = multer.diskStorage({
     destination: async (req, file, cb) => {
-      if (!req._videoBatchId) req._videoBatchId = nanoid();
+      if (!req._videoBatchId) req._videoBatchId = randomUUID();
       const batchDir = path.join(
         config.temporal.nfsPath || '/nfs-storage',
         `video-${req._videoBatchId}`

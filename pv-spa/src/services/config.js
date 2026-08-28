@@ -1,52 +1,33 @@
 // Configuration Service
 // Manages runtime configuration using environment variables only
 
+// Read from window.__ENV__ (injected by the container entrypoint at runtime),
+// falling back to import.meta.env for local Vite development.
+function readEnv() {
+  const env = window.__ENV__ || {};
+  return {
+    apiUrl: env.API_URL || import.meta.env.VITE_API_URL || 'https://vault-api.ekskog.net',
+    turnstileSiteKey: env.TURNSTILE_SITE_KEY || import.meta.env.VITE_TURNSTILE_SITE_KEY || '',
+  };
+}
+
 class ConfigService {
   constructor() {
-    // Read from window.__ENV__ (injected by Docker at runtime)
-    // Fallback to import.meta.env for local Vite development/testing
-    const env = window.__ENV__ || {};
-    // Allow persisted overrides from localStorage for development
-    const persisted = (() => {
-      try {
-        const raw = localStorage.getItem('pv_config');
-        return raw ? JSON.parse(raw) : {};
-      } catch (e) {
-        return {};
+    // apiUrl is the only key overridable from the Settings UI. Anything else
+    // stays env-managed so a stale localStorage value can't clobber it.
+    let persistedApiUrl = null;
+    try {
+      const raw = localStorage.getItem('pv_config');
+      const parsed = raw ? JSON.parse(raw) : {};
+      if (typeof parsed.apiUrl === 'string' && parsed.apiUrl.trim()) {
+        persistedApiUrl = parsed.apiUrl;
       }
-    })();
-
-    const baseConfig = {
-      apiUrl: env.API_URL || import.meta.env.VITE_API_URL || 'https://vault-api.ekskog.net',
-      appTitle: env.APP_TITLE || import.meta.env.VITE_APP_TITLE || 'EKSKOG PHOTOS',
-      appDescription: env.APP_DESCRIPTION || import.meta.env.VITE_APP_DESCRIPTION || 'Secure Photo Gallery',
-      enableUserManagement: (env.ENABLE_USER_MANAGEMENT || import.meta.env.VITE_ENABLE_USER_MANAGEMENT) === 'true',
-      enableAlbumSharing: (env.ENABLE_ALBUM_SHARING || import.meta.env.VITE_ENABLE_ALBUM_SHARING) === 'true',
-      enablePhotoComments: (env.ENABLE_PHOTO_COMMENTS || import.meta.env.VITE_ENABLE_PHOTO_COMMENTS) === 'true',
-      maxUploadSize: parseInt(env.MAX_UPLOAD_SIZE || import.meta.env.VITE_MAX_UPLOAD_SIZE || '20485760', 10),
-      thumbnailQuality: parseInt(env.THUMBNAIL_QUALITY || import.meta.env.VITE_THUMBNAIL_QUALITY || '80', 10),
-      lazyLoading: (env.LAZY_LOADING || import.meta.env.VITE_LAZY_LOADING || 'true') === 'true',
-      debugMode: (env.DEBUG_MODE || import.meta.env.VITE_DEBUG_MODE) === 'true',
-      logLevel: env.LOG_LEVEL || import.meta.env.VITE_LOG_LEVEL || 'info',
-      turnstileSiteKey: env.TURNSTILE_SITE_KEY || import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
+    } catch (e) {
+      // ignore malformed persisted config
     }
 
-    // Only allow persisted keys that are intentionally user-overridable in the UI.
-    // This prevents stale localStorage values from clobbering env-managed values
-    // such as VITE_TURNSTILE_SITE_KEY.
-    const persistedOverrides = {};
-    if (persisted && typeof persisted === 'object') {
-      if (typeof persisted.apiUrl === 'string' && persisted.apiUrl.trim()) {
-        persistedOverrides.apiUrl = persisted.apiUrl;
-      }
-    }
-
-    this.config = {
-      ...baseConfig,
-      ...persistedOverrides,
-    };
-
-    console.log('🔧 Config: Loaded from runtime configuration:', this.config)
+    this.config = readEnv();
+    if (persistedApiUrl) this.config.apiUrl = persistedApiUrl;
   }
 
   // Get entire config
@@ -83,12 +64,7 @@ class ConfigService {
   reset() {
     try {
       localStorage.removeItem('pv_config');
-      // Rebuild config from environment
-      const env = window.__ENV__ || {};
-      this.config.apiUrl = env.API_URL || import.meta.env.VITE_API_URL || 'https://vault-api.ekskog.net';
-      this.config.appTitle = env.APP_TITLE || import.meta.env.VITE_APP_TITLE || 'EKSKOG PHOTOS';
-      this.config.appDescription = env.APP_DESCRIPTION || import.meta.env.VITE_APP_DESCRIPTION || 'Secure Photo Gallery';
-      this.config.turnstileSiteKey = env.TURNSTILE_SITE_KEY || import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
+      this.config = readEnv();
       return true;
     } catch (e) {
       console.warn('Failed to reset config:', e.message);
@@ -106,12 +82,13 @@ class ConfigService {
     const testUrl = url || this.getApiUrl()
 
     try {
+      // pv-api's /health probes the converter with a 30 s cap, and the converter
+      // blocks on a sync subprocess while encoding — so a healthy system can take
+      // ~30 s to answer during a bulk upload. Abort above that, not below it, or
+      // this reports a false failure exactly when uploads are running.
       const response = await fetch(`${testUrl}/health`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        timeout: 5000
+        signal: AbortSignal.timeout(35000),
       })
 
       return {

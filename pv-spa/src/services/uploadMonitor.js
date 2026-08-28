@@ -1,6 +1,5 @@
 import { reactive, readonly } from 'vue';
 import apiService from './api.js';
-import SSEService from './sseService.js';
 import WorkflowStatusService from './workflowStatusService.js';
 import userSettings from './userSettings.js';
 
@@ -28,33 +27,11 @@ const nowIso = () => new Date().toISOString();
 
 export const isTerminalUploadStatus = (status) => TERMINAL_STATUSES.has(status);
 
-const monitoringEnabledFor = (job) => {
-  if (!job) {
-    return false;
-  }
+const monitoringEnabledFor = (job) => !!job && !!userSettings.get('monitorBulkUploads');
 
-  if (job.kind === 'legacy') {
-    return !!userSettings.get('monitorNonBulkUploads');
-  }
-
-  return !!userSettings.get('monitorBulkUploads');
-};
-
-const disabledMessageFor = (job) => {
-  if (job?.kind === 'legacy') {
-    return 'Live monitoring is disabled for non-bulk uploads. Enable it in Settings to stream progress here.';
-  }
-
-  return 'Live monitoring is disabled for bulk uploads. Enable it in Settings to poll progress here.';
-};
-
-const defaultMessageFor = (job) => {
-  if (job?.kind === 'legacy') {
-    return 'Waiting for upload processing updates...';
-  }
-
-  return 'Waiting for bulk processing updates...';
-};
+const DISABLED_MESSAGE =
+  'Live monitoring is disabled for bulk uploads. Enable it in Settings to poll progress here.';
+const DEFAULT_MESSAGE = 'Waiting for bulk processing updates...';
 
 const upsertJob = (jobId, patch) => {
   const current = jobsState[jobId] || {};
@@ -73,7 +50,6 @@ const stopMonitoring = (jobKey) => {
     return;
   }
 
-  active.sseService?.stop();
   active.workflowStatusService?.stop();
 
   if (active.progressIntervalId) {
@@ -120,116 +96,6 @@ const fetchBulkProgress = async (jobKey) => {
     status: 'RUNNING',
     message: `Uploaded ${progress.uploaded ?? 0} of ${progress.total ?? 0} files`,
   });
-};
-
-const handleLegacyUpdate = (jobKey, data) => {
-  if (!jobsState[jobKey]) {
-    return;
-  }
-
-  switch (data?.type) {
-    case 'connected':
-      upsertJob(jobKey, {
-        status: 'RUNNING',
-        message: 'Connected to upload processing service...',
-      });
-      break;
-
-    case 'started':
-      upsertJob(jobKey, {
-        status: 'RUNNING',
-        message: data.message || `Processing started for ${data.progress?.total || 0} files...`,
-        progress: {
-          current: 0,
-          total: data.progress?.total || 0,
-          uploaded: 0,
-          failed: 0,
-          percentage: 0,
-        },
-      });
-      break;
-
-    case 'progress': {
-      const progress = data.progress || {};
-      const current = progress.current ?? 0;
-      const total = progress.total ?? 0;
-      const uploaded = progress.uploaded ?? 0;
-      const failed = progress.failed ?? 0;
-      const percentage = clampPercentage(progress.percentage ?? 0);
-      let message = `Processing ${current}/${total} files`;
-
-      if (uploaded > 0 || failed > 0) {
-        const fragments = [];
-        if (uploaded > 0) {
-          fragments.push(`${uploaded} successful`);
-        }
-        if (failed > 0) {
-          fragments.push(`${failed} failed`);
-        }
-        message += ` • ${fragments.join(', ')}`;
-      }
-
-      upsertJob(jobKey, {
-        status: 'RUNNING',
-        message,
-        progress: {
-          current,
-          total,
-          uploaded,
-          failed,
-          percentage,
-          lastUploaded: progress.lastUploaded || null,
-          lastFailed: progress.lastFailed || null,
-        },
-      });
-      break;
-    }
-
-    case 'complete': {
-      const uploaded = data.results?.uploaded ?? data.progress?.uploaded ?? 0;
-      const failed = data.results?.failed ?? data.progress?.failed ?? 0;
-      const total = data.results?.total ?? uploaded + failed;
-      markTerminal(jobKey, 'COMPLETED', {
-        message: failed > 0
-          ? `Processing complete: ${uploaded} uploaded, ${failed} failed`
-          : `Processing complete: ${uploaded} uploaded`,
-        progress: {
-          current: total,
-          total,
-          uploaded,
-          failed,
-          percentage: 100,
-        },
-      });
-      break;
-    }
-
-    case 'failed':
-      markTerminal(jobKey, 'FAILED', {
-        error: data.error || 'Upload processing failed.',
-        message: data.error || 'Upload processing failed.',
-      });
-      break;
-
-    default:
-      upsertJob(jobKey, {
-        message: data?.message || jobsState[jobKey]?.message || defaultMessageFor(jobsState[jobKey]),
-      });
-  }
-};
-
-const handleLegacyError = (jobKey, error) => {
-  if (!jobsState[jobKey] || isTerminalUploadStatus(jobsState[jobKey].status)) {
-    return;
-  }
-
-  upsertJob(jobKey, {
-    status: 'FAILED',
-    error: error?.message || 'Lost connection to upload processing stream.',
-    message: error?.message || 'Lost connection to upload processing stream.',
-    completedAt: nowIso(),
-  });
-  stopMonitoring(jobKey);
 };
 
 const handleBulkStatusUpdate = (jobKey, payload) => {
@@ -300,36 +166,6 @@ const handleBulkStatusError = (jobKey, error) => {
   });
 };
 
-const startLegacyMonitoring = (jobKey) => {
-  const job = jobsState[jobKey];
-  if (!job?.jobId) {
-    return;
-  }
-
-  const active = controllers.get(jobKey) || {};
-  if (active.sseService) {
-    return;
-  }
-
-  const sseService = new SSEService(
-    apiService,
-    job.jobId,
-    (data) => handleLegacyUpdate(jobKey, data),
-    (error) => handleLegacyError(jobKey, error)
-  );
-
-  controllers.set(jobKey, {
-    ...active,
-    sseService,
-  });
-
-  upsertJob(jobKey, {
-    status: 'RUNNING',
-    message: job.message || defaultMessageFor(job),
-  });
-  sseService.start();
-};
-
 const startBulkMonitoring = (jobKey) => {
   const job = jobsState[jobKey];
   if (!job?.workflowId) {
@@ -359,7 +195,7 @@ const startBulkMonitoring = (jobKey) => {
 
   upsertJob(jobKey, {
     status: job.status === 'ACCEPTED' ? 'RUNNING' : job.status,
-    message: job.message || defaultMessageFor(job),
+    message: job.message || DEFAULT_MESSAGE,
   });
 };
 
@@ -374,13 +210,8 @@ const syncMonitoringForJob = (jobKey) => {
     stopMonitoring(jobKey);
     upsertJob(jobKey, {
       status: 'ACCEPTED',
-      message: disabledMessageFor(job),
+      message: DISABLED_MESSAGE,
     });
-    return;
-  }
-
-  if (job.kind === 'legacy') {
-    startLegacyMonitoring(jobKey);
     return;
   }
 
@@ -389,37 +220,6 @@ const syncMonitoringForJob = (jobKey) => {
 
 const syncAllMonitoring = () => {
   Object.keys(jobsState).forEach((jobKey) => syncMonitoringForJob(jobKey));
-};
-
-const registerLegacyUpload = ({ jobId, albumName }) => {
-  if (!jobId) {
-    return null;
-  }
-
-  const jobKey = `legacy:${jobId}`;
-  upsertJob(jobKey, {
-    id: jobKey,
-    kind: 'legacy',
-    status: monitoringEnabledFor({ kind: 'legacy' }) ? 'RUNNING' : 'ACCEPTED',
-    title: 'Photo upload',
-    albumName: albumName || '',
-    jobId,
-    workflowId: null,
-    batchId: null,
-    message: monitoringEnabledFor({ kind: 'legacy' }) ? defaultMessageFor({ kind: 'legacy' }) : disabledMessageFor({ kind: 'legacy' }),
-    progress: {
-      current: 0,
-      total: 0,
-      uploaded: 0,
-      failed: 0,
-      percentage: 0,
-    },
-    startedAt: jobsState[jobKey]?.startedAt || nowIso(),
-    completedAt: null,
-    error: null,
-  });
-  syncMonitoringForJob(jobKey);
-  return jobKey;
 };
 
 const registerBulkUpload = ({ workflowId, batchId, albumName }) => {
@@ -437,7 +237,7 @@ const registerBulkUpload = ({ workflowId, batchId, albumName }) => {
     jobId: null,
     workflowId,
     batchId: batchId || null,
-    message: monitoringEnabledFor({ kind: 'bulk' }) ? defaultMessageFor({ kind: 'bulk' }) : disabledMessageFor({ kind: 'bulk' }),
+    message: monitoringEnabledFor({ kind: 'bulk' }) ? DEFAULT_MESSAGE : DISABLED_MESSAGE,
     progress: {
       current: 0,
       total: 0,
@@ -467,7 +267,6 @@ if (typeof userSettings.onChange === 'function') {
 export function useUploadMonitor() {
   return {
     jobs: readonly(jobsState),
-    registerLegacyUpload,
     registerBulkUpload,
     clearTrackedJob,
     syncAllMonitoring,

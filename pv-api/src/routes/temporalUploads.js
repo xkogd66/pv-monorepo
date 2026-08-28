@@ -8,17 +8,14 @@ const debugBulkApi = debug("pv:server:bulk");
 const database = require("../services/database-service");
 
 const multer = require("multer");
-const { nanoid } = require("nanoid");
+const { randomUUID } = require("crypto");
 const mime = require('mime-types');
 const fs = require('fs').promises;
 const path = require('path');
-const MetadataService = require("../services/metadata-service");
 // Use memory storage to handle the manual write to NFS
 const upload = multer({ storage: multer.memoryStorage() });
 
-module.exports = (getTemporalClient, config, { sendSSEEvent, persistProgress, getProgress } = {}) => {
-    const metadataService = new MetadataService(null);
-
+module.exports = (getTemporalClient, config, { persistProgress, getProgress } = {}) => {
     const toIsoStringOrNull = (value) => {
         if (!value) return null;
         const date = new Date(value);
@@ -32,7 +29,7 @@ module.exports = (getTemporalClient, config, { sendSSEEvent, persistProgress, ge
     router.post("/upload/:folder", upload.array("images"), (req, res) => {
         const { folder } = req.params;
         const files = req.files;
-        const batchId = nanoid();
+        const batchId = randomUUID();
 
         debugBulkApi(`New bulk upload request received — folder: "${folder}", batchId: ${batchId}, files: ${files?.length ?? 0}`);
 
@@ -65,16 +62,14 @@ module.exports = (getTemporalClient, config, { sendSSEEvent, persistProgress, ge
                 // Map and write the files to the NFS
                 const imagePaths = await Promise.all(
                     files.map(async (file) => {
-                        const extractedMetadata = await metadataService.extractEssentialMetadata(file.buffer, file.originalname);
                         const filePath = path.join(batchDir, file.originalname);
                         await fs.writeFile(filePath, file.buffer);
-                        
+
                         const detectedType = mime.lookup(file.originalname);
                         return {
                             filename: file.originalname,
                             path: filePath,
                             contentType: detectedType || file.mimetype,
-                            metadata: extractedMetadata,
                         };
                     })
                 );
@@ -124,23 +119,6 @@ module.exports = (getTemporalClient, config, { sendSSEEvent, persistProgress, ge
             const body = req.body || {};
             const jobId = body.workflowId || body.batchId;
             if (!jobId) return res.status(400).json({ success: false, message: 'Missing workflowId/batchId' });
-
-            if (typeof sendSSEEvent === 'function') {
-                debugBulkApi('[internal/progress] Sending SSE event for jobId:', jobId);
-                sendSSEEvent(jobId, 'progress', {
-                    status: body.state || 'processing',
-                    message: body.message || null,
-                    progress: {
-                        current: body.processed || null,
-                        total: body.totalRequested || null,
-                        percentage: body.percentage || null,
-                        lastUploaded: body.lastFile || null,
-                        uploaded: body.successful || null,
-                        failed: body.failed || null,
-                    },
-                    timestamp: body.timestamp || new Date().toISOString(),
-                });
-            }
 
             // Persist if helper provided
             if (typeof persistProgress === 'function') {

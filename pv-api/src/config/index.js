@@ -45,22 +45,6 @@ const config = {
     publicUrl: process.env.MINIO_PUBLIC_URL || null,
   },
 
-  // Upload Configuration
-  upload: {
-    maxFileSize: 2 * 1024 * 1024 * 1024, // 2GB
-    allowedMimeTypes: [
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/webp",
-      "image/avif",
-      "video/mp4",
-      "video/mov",
-      "video/avi",
-      "video/quicktime",
-    ],
-  },
-
   // AVIF Converter Configuration
   converter: {
     url: process.env.AVIF_CONVERTER_URL,
@@ -92,43 +76,12 @@ const config = {
     connectTimeout: 60000,
   },
 
-  // SSE Configuration
-  sse: {
-    connectionTimeout: 300000, // 5 minutes
-    cleanupInterval: 60000, // 1 minute
-  },
-
-  // Logging Configuration
-  logging: {
-    level: process.env.LOG_LEVEL || "info",
-    enableDebug: process.env.NODE_ENV === "development",
-  },
-
   mapbox_token: process.env.MAPBOX_TOKEN, // Kubernetes Configuration (if applicable)
   kubernetes: {
     serviceName: process.env.K8S_SERVICE_NAME || "pv-api-service",
     namespace: process.env.K8S_NAMESPACE || "pv",
     publicUrl: process.env.PUBLIC_API_URL || "https://vault-api.ekskog.net",
   },
-};
-
-// Validation function to ensure required config is present
-const validateConfig = () => {
-  const required = [
-    "minio.endpoint",
-    "minio.accessKey",
-    "minio.secretKey",
-    "minio.bucketName",
-  ];
-
-  const missing = required.filter((key) => {
-    const value = key.split(".").reduce((obj, k) => obj?.[k], config);
-    return !value;
-  });
-
-  if (missing.length > 0) {
-    throw new Error(`Missing required configuration: ${missing.join(", ")}`);
-  }
 };
 
 debugConfig("Configuration loaded:", {
@@ -145,7 +98,4 @@ debugConfig("Configuration loaded:", {
   },
 });
 
-module.exports = {
-  ...config,
-  validateConfig,
-};
+module.exports = config;

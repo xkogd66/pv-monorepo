@@ -7,69 +7,53 @@ const config = require("../config");
 const database = require("../services/database-service");
 
 /**
- * Health check route logic
+ * Health check route logic.
  * Decoupled to allow the pod to stay alive (200 OK) even if non-critical
  * services like Temporal or MinIO are still warming up or misconfigured.
- *
- * Improvements over previous version:
- *  1. All four checks run concurrently via Promise.allSettled — total latency
- *     is bounded by the slowest single check, not their sum.
- *  2. Temporal timeout raised to 4 s (well under the k8s readinessProbe
- *     timeoutSeconds: 5) to avoid false negatives on cold gRPC channels.
- *  3. The Temporal gRPC channel is warmed eagerly at startup via
- *     warmTemporalChannel() — call this once after creating your client so
- *     health-check calls never pay the connection-setup cost.
- *  4. Minor: converter fetch timeout now reads from config (falls back 4 s).
  */
 
-// ---------------------------------------------------------------------------
-// Channel warm-up — call once at application startup, BEFORE the first
-// health check fires.  Safe to call multiple times; subsequent calls no-op.
-// ---------------------------------------------------------------------------
 /**
+ * Warm the Temporal gRPC channel once at startup so health-check calls never
+ * pay the connection-setup cost. Safe to call multiple times.
  * @param {import('@temporalio/client').Client} temporalClient
  */
 async function warmTemporalChannel(temporalClient) {
   if (!temporalClient) return;
   try {
-    // Try the low-level channel API if available; otherwise fall back to
-    // a single describeNamespace call which also forces the gRPC channel
-    // to establish a connection.
-    const channelClient = temporalClient.workflowService && temporalClient.workflowService.client;
-    if (channelClient && typeof channelClient.getChannel === 'function') {
-      const channel = channelClient.getChannel();
-      if (channel && typeof channel.getConnectivityState === 'function') {
-        channel.getConnectivityState(true); // true = try to connect
-        debugHealth("Temporal gRPC channel warm-up requested (via getChannel)");
-      }
-    } else {
-      // Fallback: perform a lightweight describeNamespace to warm the channel
-      await temporalClient.workflowService.describeNamespace({
-        namespace: config.temporal?.namespace || "default",
-      });
-      debugHealth("Temporal warm-up via describeNamespace succeeded");
-    }
+    await temporalClient.workflowService.describeNamespace({
+      namespace: config.temporal?.namespace || "default",
+    });
+    debugHealth("Temporal warm-up via describeNamespace succeeded");
   } catch (err) {
     debugHealth("Temporal channel warm-up failed (non-fatal):", err.message);
   }
 }
 
 // ---------------------------------------------------------------------------
-// Individual service checks
+// Individual service checks — also reused by the startup dependency check
 // ---------------------------------------------------------------------------
+
+/**
+ * Reject after `ms` if `promise` hasn't settled. Needed for the MinIO SDK and
+ * the Temporal gRPC client, neither of which accepts an AbortSignal — without
+ * it a hung dependency hangs the readiness probe indefinitely.
+ */
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
 
 /**
  * Returns true if MinIO is reachable and the configured bucket is listable.
  * @param {import('minio').Client} minioClient
- * @returns {Promise<boolean>}
  */
 async function checkMinioHealth(minioClient) {
   if (!minioClient) return false;
   try {
-    await Promise.race([
-      minioClient.bucketExists(config.minio.bucketName),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000))
-    ]);
+    await withTimeout(minioClient.bucketExists(config.minio.bucketName), 3000, "MinIO");
     return true;
   } catch {
     return false;
@@ -78,116 +62,94 @@ async function checkMinioHealth(minioClient) {
 
 /**
  * Returns true if the Temporal namespace is reachable.
- * Uses a 4 s timeout — long enough for a cold-but-healthy gRPC channel,
- * short enough to stay well within the k8s probe timeout.
+ * 4 s is long enough for a cold-but-healthy gRPC channel and stays well
+ * within the k8s readinessProbe timeoutSeconds: 5.
  * @param {import('@temporalio/client').Client} temporalClient
- * @returns {Promise<boolean>}
  */
 async function checkTemporalHealth(temporalClient) {
   if (!temporalClient) return false;
-
-  const TEMPORAL_TIMEOUT_MS = 4000;
-
-  const timeoutPromise = new Promise((_, reject) =>
-    setTimeout(
-      () => reject(new Error(`Temporal gRPC timeout after ${TEMPORAL_TIMEOUT_MS} ms`)),
-      TEMPORAL_TIMEOUT_MS
-    )
-  );
-
-  await Promise.race([
-    temporalClient.workflowService.describeNamespace({
-      namespace: config.temporal?.namespace || "default",
-    }),
-    timeoutPromise,
-  ]);
-
-  return true;
+  try {
+    await withTimeout(
+      temporalClient.workflowService.describeNamespace({
+        namespace: config.temporal?.namespace || "default",
+      }),
+      4000,
+      "Temporal gRPC",
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Returns true if the converter sidecar responds with a 2xx on /health.
- * @returns {Promise<boolean>}
+ * Returns true if the converter responds with a 2xx on /health.
+ * Allow up to 30 s: a converter pod may be mid-conversion and legitimately
+ * slow to respond without being unhealthy.
  */
 async function checkConverterHealth() {
-  const converterUrl = config.converter.url;
-  // Allow up to 30 s: a converter pod may be mid-conversion and legitimately
-  // slow to respond to /health without being unhealthy.
+  if (!config.converter?.url) return false;
   const timeout = Math.min(parseInt(config.converter.timeout, 10) || 30000, 30000);
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
-
   try {
-    const response = await fetch(`${converterUrl}/health`, {
-      signal: controller.signal,
+    const response = await fetch(`${config.converter.url}/health`, {
+      signal: AbortSignal.timeout(timeout),
     });
     return response.ok;
-  } finally {
-    clearTimeout(timer);
+  } catch {
+    return false;
   }
+}
+
+/** Runs all four checks concurrently. Never throws. */
+async function checkAllDependencies(minioClient, temporalClient) {
+  const [minio, db, temporal, converter] = await Promise.all([
+    checkMinioHealth(minioClient),
+    database.isHealthy().then(Boolean).catch(() => false),
+    checkTemporalHealth(temporalClient),
+    checkConverterHealth(),
+  ]);
+  return { minio, database: db, temporal, converter };
 }
 
 // ---------------------------------------------------------------------------
 // Main handler
 // ---------------------------------------------------------------------------
 
-const dependencyStatus = require('../services/dependency-status');
+const dependencyStatus = require("../services/dependency-status");
 
 const healthCheck = (minioClient, temporalClient) => async (req, res) => {
-  // Run all checks concurrently so total latency ≈ slowest single check
-  const [minioResult, databaseResult, temporalResult, converterResult] =
-    await Promise.allSettled([
-      checkMinioHealth(minioClient),
-      database.isHealthy(),
-      checkTemporalHealth(temporalClient),
-      checkConverterHealth(),
-    ]);
-
-  const valueOf = (settled) =>
-    settled.status === "fulfilled" ? Boolean(settled.value) : false;
-
-  const minioHealthy     = valueOf(minioResult);
-  const databaseHealthy  = valueOf(databaseResult);
-  const temporalHealthy  = valueOf(temporalResult);
-  const converterHealthy = valueOf(converterResult);
+  const results = await checkAllDependencies(minioClient, temporalClient);
 
   // Log individual failures for easier debugging
-  if (!minioHealthy)     debugHealth("❌ MinIO failure:",     minioResult.reason?.message     ?? "returned false");
-  if (!databaseHealthy)  debugHealth("❌ Database failure:",  databaseResult.reason?.message  ?? "returned false");
-  if (!temporalHealthy)  debugHealth("❌ Temporal failure:",  temporalResult.reason?.message  ?? "returned false");
-  if (!converterHealthy) debugHealth("❌ Converter failure:", converterResult.reason?.message ?? "returned false");
+  for (const [name, ok] of Object.entries(results)) {
+    if (!ok) debugHealth(`❌ ${name} check failed`);
+  }
 
   // "Ready" only when every dependency is healthy
-  const isReady = minioHealthy && converterHealthy && databaseHealthy && temporalHealthy;
+  const isReady =
+    results.minio && results.converter && results.database && results.temporal;
 
   // "Alive" as long as the database is up — Temporal/MinIO/converter issues
   // should NOT trigger a pod restart; they can be fixed without restarting.
-  const isAlive = databaseHealthy;
+  const isAlive = results.database;
 
-  const httpStatus = isAlive ? 200 : 503;
-
-  res.status(httpStatus).json({
+  res.status(isAlive ? 200 : 503).json({
     status: isReady ? "healthy" : "degraded",
     timestamp: new Date().toISOString(),
     ready: isReady,
     startupDependencies: dependencyStatus.get() || null,
     services: {
-      minio:     { connected: minioHealthy },
-      database:  { connected: databaseHealthy },
-      temporal:  { connected: temporalHealthy },
-      converter: { connected: converterHealthy },
+      minio: { connected: results.minio },
+      database: { connected: results.database },
+      temporal: { connected: results.temporal },
+      converter: { connected: results.converter },
     },
     checks: {
-      liveness:  isAlive,
+      liveness: isAlive,
       readiness: isReady,
     },
   });
 };
-
-// ---------------------------------------------------------------------------
-// Router factory
-// ---------------------------------------------------------------------------
 
 module.exports = (minioClient, temporalClient) => {
   const router = express.Router();
@@ -195,5 +157,5 @@ module.exports = (minioClient, temporalClient) => {
   return router;
 };
 
-// Export warm-up helper so app startup can call it
 module.exports.warmTemporalChannel = warmTemporalChannel;
+module.exports.checkAllDependencies = checkAllDependencies;
