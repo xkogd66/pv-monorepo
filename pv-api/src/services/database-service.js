@@ -345,7 +345,7 @@ class Database {
     const connection = await this.pool.getConnection();
     try {
       const [rows] = await connection.execute(
-        "SELECT name, slug, path, description, counter, year, month, created_at, updated_at FROM albums ORDER BY created_at DESC"
+        "SELECT name, slug, path, description, counter, cover, year, month, created_at, updated_at FROM albums ORDER BY created_at DESC"
       );
       return rows;
     } finally {
@@ -392,6 +392,21 @@ class Database {
 
       const [result] = await connection.execute(updateQuery, params);
 
+      return result.affectedRows > 0;
+    } finally {
+      connection.release();
+    }
+  }
+
+  // Set the album cover, but only if one hasn't been chosen yet. The WHERE
+  // clause does the "only if empty" check so concurrent uploads can't race.
+  async setAlbumCoverIfEmpty(coverFilename, albumName) {
+    const connection = await this.pool.getConnection();
+    try {
+      const [result] = await connection.execute(
+        "UPDATE albums SET cover = ? WHERE name = ? AND cover IS NULL",
+        [coverFilename, albumName]
+      );
       return result.affectedRows > 0;
     } finally {
       connection.release();

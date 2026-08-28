@@ -151,9 +151,11 @@ Non-sensitive vars live in ConfigMaps per service under `k8s/base/<service>/conf
 |---|---|---|
 | POST | `/auth/login` | JWT login (with Turnstile CAPTCHA) |
 | POST | `/auth/register` | User registration |
-| GET | `/albums` | List albums |
-| POST | `/albums` | Create album |
-| DELETE | `/albums/:id` | Delete album |
+| GET | `/albums` | List albums (includes `year`, `month`, `fileCount` metadata) |
+| POST | `/album/:folderPath` | Create album with optional `month`/`year` metadata (admin) |
+| PUT | `/album/:currentName` | Rename and/or edit album metadata — `name`, `description`, `month`, `year` (admin) |
+| DELETE | `/buckets/:bucketName/folders` | Delete album and its photos (admin) |
+| GET | `/objects/:name` | List photos in an album (presigned URLs) |
 | POST | `/bulk/upload/:folder` | Image upload → Temporal workflow (returns 202 + batchId) |
 | POST | `/video/upload/:folder` | Video upload → Temporal workflow (returns 202 + batchId) |
 | GET | `/bulk/status/:workflowId` | Poll bulk workflow status |
@@ -298,6 +300,45 @@ Thumbnails are pre-generated WebP files stored at `<album>/thumbs/<filename>.web
 - `PhotoCard.vue` loads `thumbnailUrl` for the grid. On error (thumbnail missing), it silently falls back to the full-res presigned URL without showing an error to the user. On successful thumbnail load, it prefetches the full-res URL so the lightbox opens instantly.
 - Thumbnails are deleted alongside their parent AVIF when a photo is deleted (`albums.js` `deleteObjects`).
 
+
+---
+
+## Album Year Metadata (`albums.year` / `albums.month`)
+
+Albums carry an optional **year** and **month** that describe the album's content
+(e.g. "summer 2025 photos"), stored as `INT` columns in the `albums` table. They are
+**album metadata**, not `created_at` (when the album was created) and not `updated_at`
+(last upload).
+
+**How they are set:**
+- Created: `CreateAlbumDialog` (SPA) → `POST /album/:folderPath` with optional `month`/`year`.
+- Edited after creation: **Edit Album** dialog (`Albums.vue`, pencil button on `AlbumCard`) → `PUT /album/:currentName`.
+
+**How they are exposed:**
+- `GET /albums` returns `year` and `month` per album (nullable). `getAllAlbums()` in
+  `pv-api/src/services/database-service.js` selects the columns; `getAlbums()` in
+  `pv-api/src/routes/albums.js` passes them through.
+
+**SPA year filter (`Albums.vue`):**
+- A "Year:" dropdown filters the grid to albums whose `year` matches the selection.
+  Options are the distinct non-null years across all albums, sorted most-recent-first.
+- Albums with `year = NULL` appear only under "All years".
+- The pipeline is `filteredAlbums` → `sortedAlbums` → `paginatedAlbums`; sorting and
+  pagination compose with the filter. Selecting a year resets to page 1.
+- An empty year-filter result shows "No Albums in {year}" instead of the generic empty state.
+- `AlbumCard.vue` renders a small year badge next to the photo count when `album.year` is set.
+
+**`PUT /album/:currentName` (admin) — update semantics:**
+Accepts `newName`, `description`, `month`, `year` in the body. Behavior depends on the name:
+- **Name unchanged** (or omitted) → metadata-only update of `description`/`month`/`year`
+  in MariaDB; no MinIO movement.
+- **Name changed** → full rename: MinIO objects are copied to the new path, the album
+  metadata JSON (`<folder>/<folder>.json`) is rewritten, and `name`/`path` plus any edited
+  `description`/`month`/`year` are persisted in the DB. Old objects are deleted only after
+  the copy and DB update succeed.
+- `month`/`year` are coerced to integers (or `NULL` when cleared). Fields not sent fall back
+  to existing values, so callers can send just `{ newName }` (old rename behavior) or just
+  metadata changes.
 
 ---
 

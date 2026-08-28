@@ -130,6 +130,16 @@ module.exports = (getTemporalClient, config, { persistProgress, getProgress } = 
                 database.incrementFileCounter(body.successful, body.albumName).catch((err) => {
                     debugBulkApi('[internal/progress] Failed to update album counter:', err.message);
                 });
+
+                // First successful upload into an album also picks its cover.
+                // lastFile is the source filename; pv-converter writes the
+                // thumbnail as <base>.webp under <album>/thumbs/.
+                if (body.lastFile) {
+                    const coverFilename = body.lastFile.replace(/\.[^.]+$/, '.webp');
+                    database.setAlbumCoverIfEmpty(coverFilename, body.albumName).catch((err) => {
+                        debugBulkApi('[internal/progress] Failed to set album cover:', err.message);
+                    });
+                }
             }
 
             return res.json({ success: true });

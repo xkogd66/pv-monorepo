@@ -1,67 +1,42 @@
 <template>
   <div class="max-w-[1200px] mx-auto px-4 py-8">
-    <div class="flex flex-wrap justify-between items-center gap-4 mb-12">
+    <div class="flex flex-wrap justify-between items-end gap-4 mb-9">
+      <div>
+        <h1 class="text-2xl font-semibold tracking-tight text-gray-900">Albums</h1>
+        <p class="mt-1.5 text-sm text-gray-500 tabular-nums">{{ summaryLine }}</p>
+      </div>
 
-      <!-- Actions Section -->
-      <div class="flex items-center gap-3 flex-wrap">
-        <!-- Sort Controls (only show when albums exist) -->
-        <div v-if="!loading && !error && albums.length > 0" class="flex items-center gap-2 flex-wrap">
-          <!-- Year filter dropdown -->
-          <div v-if="availableYears.length > 0" class="flex items-center gap-2">
-            <span class="text-sm text-gray-600 hidden sm:inline">Year:</span>
-            <select
-              v-model="selectedYear"
-              title="Filter albums by year"
-              class="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-            >
-              <option :value="null">All years</option>
-              <option v-for="y in availableYears" :key="y" :value="y">{{ y }}</option>
-            </select>
-          </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <select
+          v-if="!loading && !error && availableYears.length > 0"
+          v-model="selectedYear"
+          title="Filter albums by year"
+          class="h-[34px] px-2.5 text-[13px] border border-gray-200 rounded-md bg-white text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+        >
+          <option :value="null">All years</option>
+          <option v-for="y in availableYears" :key="y" :value="y">{{ y }}</option>
+        </select>
 
-          <span class="text-sm text-gray-600 hidden sm:inline">Sort by:</span>
+        <select
+          v-if="!loading && !error && albums.length > 0"
+          v-model="sortOrder"
+          title="Sort albums"
+          class="h-[34px] px-2.5 text-[13px] border border-gray-200 rounded-md bg-white text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+        >
+          <option value="date-desc">Newest first</option>
+          <option value="date-asc">Oldest first</option>
+          <option value="name-asc">Name A&ndash;Z</option>
+          <option value="name-desc">Name Z&ndash;A</option>
+        </select>
 
-          <!-- Date sorting buttons -->
-          <div class="flex bg-white border border-gray-300 rounded-md overflow-hidden">
-            <button
-              @click="sortOrder = 'date-desc'"
-              :class="['px-3 py-2 text-sm transition whitespace-nowrap', sortOrder === 'date-desc' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']"
-            >
-              <i class="fas fa-calendar-alt mr-1"></i><span class="hidden lg:inline">Date</span> &darr;
-            </button>
-            <button
-              @click="sortOrder = 'date-asc'"
-              :class="['px-3 py-2 text-sm transition whitespace-nowrap', sortOrder === 'date-asc' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']"
-            >
-              <i class="fas fa-calendar-alt mr-1"></i><span class="hidden lg:inline">Date</span> &uarr;
-            </button>
-          </div>
-
-          <!-- Name sorting buttons -->
-          <div class="flex bg-white border border-gray-300 rounded-md overflow-hidden">
-            <button
-              @click="sortOrder = 'name-asc'"
-              :class="['px-3 py-2 text-sm transition whitespace-nowrap', sortOrder === 'name-asc' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']"
-            >
-              <i class="fas fa-sort-alpha-down mr-1"></i><span class="hidden lg:inline">Name</span> &darr;
-            </button>
-            <button
-              @click="sortOrder = 'name-desc'"
-              :class="['px-3 py-2 text-sm transition whitespace-nowrap', sortOrder === 'name-desc' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200']"
-            >
-              <i class="fas fa-sort-alpha-up mr-1"></i><span class="hidden lg:inline">Name</span> &uarr;
-            </button>
-          </div>
-        </div>
-
-        <!-- Action Buttons -->
         <button @click="refreshAlbums" :disabled="loading" title="Refresh albums"
-          class="bg-gray-100 text-gray-800 border border-gray-300 px-4 py-3 rounded-md text-sm font-medium transition hover:bg-gray-200 disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap">
-          <i class="fas fa-sync-alt" :class="{ 'fa-spin': loading }"></i> <span class="hidden sm:inline">Refresh</span>
+          class="w-[34px] h-[34px] flex items-center justify-center border border-gray-200 rounded-md bg-white text-gray-600 text-[13px] transition hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed">
+          <i class="fas fa-sync-alt" :class="{ 'fa-spin': loading }"></i>
         </button>
+
         <button v-if="canCreateAlbum" @click="showCreateDialog = true"
-          class="bg-blue-500 text-white px-4 py-3 rounded-md text-sm font-semibold shadow-md transition hover:bg-blue-600 hover:-translate-y-[1px] hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap">
-          <i class="fas fa-plus"></i> <span class="hidden sm:inline">Create Album</span>
+          class="h-[34px] px-3.5 bg-blue-600 text-white rounded-md text-[13px] font-semibold transition hover:bg-blue-700 whitespace-nowrap">
+          <i class="fas fa-plus mr-1.5"></i>New album
         </button>
       </div>
     </div>
@@ -83,7 +58,7 @@
 
     <!-- Albums Grid -->
     <div v-if="!loading && !error">
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-8">
         <AlbumCard
           v-for="album in paginatedAlbums"
           :key="album.name"
@@ -273,6 +248,13 @@ const filteredAlbums = computed(() => {
   return albums.value.filter((album) => album.year === selectedYear.value);
 });
 
+// Header summary — counts what the year filter is actually showing
+const summaryLine = computed(() => {
+  const count = filteredAlbums.value.length;
+  const photos = filteredAlbums.value.reduce((sum, a) => sum + (a.fileCount || 0), 0);
+  return `${count} ${count === 1 ? 'album' : 'albums'} · ${photos.toLocaleString()} photos`;
+});
+
 // Computed property for sorted albums (sorts within the year-filtered set)
 const sortedAlbums = computed(() => {
   return [...filteredAlbums.value].sort((a, b) => {
@@ -342,6 +324,7 @@ const loadAlbums = async () => {
           year: album.year ?? null,
           month: album.month ?? null,
           description: album.description ?? '',
+          coverThumbnailUrl: album.coverThumbnailUrl ?? null,
 
         }
       })

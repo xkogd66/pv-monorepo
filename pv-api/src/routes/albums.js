@@ -27,15 +27,61 @@ function normalizeFolderPath(input) {
   return p;
 }
 
-const getAlbums = (minioClient) => async (req, res) => {
+// ponytail: one-time lazy backfill — albums that predate the cover column cost
+// one MinIO list each on the first /albums call after deploy, then never again.
+// Delete this once every album has a cover.
+async function backfillCover(album) {
+  if (!album.counter) return null;
+  const { listAllObjects } = require("../services/minio-list-service");
+  try {
+    for await (const obj of listAllObjects(
+      config.minio.endpoint,
+      config.minio.port,
+      config.minio.useSSL,
+      config.minio.accessKey,
+      config.minio.secretKey,
+      config.minio.bucketName,
+      `${album.name}/thumbs/`,
+    )) {
+      const filename = obj.name.split("/").pop();
+      if (!filename) continue;
+      await database.setAlbumCoverIfEmpty(filename, album.name);
+      return filename;
+    }
+  } catch (error) {
+    debugAlbum(`Cover backfill failed for ${album.name}: ${error.message}`);
+  }
+  return null;
+}
+
+const getAlbums = (minioClient, publicMinioClient) => async (req, res) => {
   try {
     const albums = await database.getAllAlbums();
-    const albumMetadata = albums.map((album) => ({
-      ...album,
-      fileCount: album.counter || 0,
-      year: album.year ?? null,
-      month: album.month ?? null,
-    }));
+    const presignedExpiry = 3600; // 1 hour
+
+    const albumMetadata = await Promise.all(
+      albums.map(async (album) => {
+        const cover = album.cover || (await backfillCover(album));
+
+        let coverThumbnailUrl = null;
+        if (cover && publicMinioClient) {
+          coverThumbnailUrl = await publicMinioClient.presignedGetObject(
+            config.minio.bucketName,
+            `${album.name}/thumbs/${cover}`,
+            presignedExpiry,
+          );
+        }
+
+        return {
+          ...album,
+          fileCount: album.counter || 0,
+          year: album.year ?? null,
+          month: album.month ?? null,
+          coverThumbnailUrl,
+        };
+      }),
+    );
+
     res.json({ success: true, albums: albumMetadata });
   } catch (error) {
     debugAlbum("Error:", error.message);
@@ -766,7 +812,7 @@ const renameAlbum = (minioClient) => async (req, res) => {
 
 // Consolidate the module.exports into a single export
 module.exports = (minioClient, { publicMinioClient = null } = {}) => {
-  router.get("/albums", getAlbums(minioClient));
+  router.get("/albums", getAlbums(minioClient, publicMinioClient));
   router.get("/album/:name", getPhotos(minioClient, publicMinioClient));
   router.get("/objects/:name", getPhotos(minioClient, publicMinioClient));
   router.get("/albums/:name/object/:object", getObject(minioClient));
