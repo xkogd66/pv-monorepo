@@ -51,11 +51,15 @@ function withTimeout(promise, ms, label) {
  * @param {import('minio').Client} minioClient
  */
 async function checkMinioHealth(minioClient) {
-  if (!minioClient) return false;
+  if (!minioClient) {
+    debugHealth("MinIO check failed: no client configured");
+    return false;
+  }
   try {
     await withTimeout(minioClient.bucketExists(config.minio.bucketName), 3000, "MinIO");
     return true;
-  } catch {
+  } catch (err) {
+    debugHealth(`MinIO check failed: ${err.message}`);
     return false;
   }
 }
@@ -67,7 +71,10 @@ async function checkMinioHealth(minioClient) {
  * @param {import('@temporalio/client').Client} temporalClient
  */
 async function checkTemporalHealth(temporalClient) {
-  if (!temporalClient) return false;
+  if (!temporalClient) {
+    debugHealth("Temporal check failed: no client (not yet connected)");
+    return false;
+  }
   try {
     await withTimeout(
       temporalClient.workflowService.describeNamespace({
@@ -77,7 +84,8 @@ async function checkTemporalHealth(temporalClient) {
       "Temporal gRPC",
     );
     return true;
-  } catch {
+  } catch (err) {
+    debugHealth(`Temporal check failed: ${err.message}`);
     return false;
   }
 }
@@ -88,14 +96,19 @@ async function checkTemporalHealth(temporalClient) {
  * slow to respond without being unhealthy.
  */
 async function checkConverterHealth() {
-  if (!config.converter?.url) return false;
+  if (!config.converter?.url) {
+    debugHealth("Converter check failed: AVIF_CONVERTER_URL not set");
+    return false;
+  }
   const timeout = Math.min(parseInt(config.converter.timeout, 10) || 30000, 30000);
   try {
     const response = await fetch(`${config.converter.url}/health`, {
       signal: AbortSignal.timeout(timeout),
     });
+    if (!response.ok) debugHealth(`Converter check failed: HTTP ${response.status}`);
     return response.ok;
-  } catch {
+  } catch (err) {
+    debugHealth(`Converter check failed: ${err.message}`);
     return false;
   }
 }
@@ -104,7 +117,13 @@ async function checkConverterHealth() {
 async function checkAllDependencies(minioClient, temporalClient) {
   const [minio, db, temporal, converter] = await Promise.all([
     checkMinioHealth(minioClient),
-    database.isHealthy().then(Boolean).catch(() => false),
+    database
+      .isHealthy()
+      .then(Boolean)
+      .catch((err) => {
+        debugHealth(`Database check failed: ${err.message}`);
+        return false;
+      }),
     checkTemporalHealth(temporalClient),
     checkConverterHealth(),
   ]);
@@ -119,11 +138,6 @@ const dependencyStatus = require("../services/dependency-status");
 
 const healthCheck = (minioClient, temporalClient) => async (req, res) => {
   const results = await checkAllDependencies(minioClient, temporalClient);
-
-  // Log individual failures for easier debugging
-  for (const [name, ok] of Object.entries(results)) {
-    if (!ok) debugHealth(`❌ ${name} check failed`);
-  }
 
   // "Ready" only when every dependency is healthy
   const isReady =

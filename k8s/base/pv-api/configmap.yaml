@@ -29,7 +29,7 @@ data:
   TASK_QUEUE: "pv-image-processing"
 
   # Database Connection (non-sensitive)
-  DB_HOST: "mariadb.data.svc.cluster.local"
+  DB_HOST: "mariadb-service.data.svc.cluster.local"
   DB_PORT: "3306"
   DB_USER: "pv_app"
   DB_NAME: "photovault"

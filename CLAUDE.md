@@ -86,7 +86,7 @@ All of these must be running for the full system to work:
 | Service | Address | Purpose |
 |---|---|---|
 | MinIO | `mjolnir:9000` | S3-compatible object storage (bucket: `photovault`) |
-| MariaDB | `mariadb.data.svc.cluster.local:3306` | User/album relational data |
+| MariaDB | `mariadb-service.data.svc.cluster.local:3306` | User/album relational data |
 | Temporal | `temporal-frontend.temporal.svc.cluster.local:7233` | Workflow orchestration |
 | NFS mount | `/nfs-storage` | Staging area for bulk uploads |
 | Mapbox (optional) | API call | Reverse geocoding for GPS coordinates |

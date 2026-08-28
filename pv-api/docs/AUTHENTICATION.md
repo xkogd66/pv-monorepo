@@ -51,7 +51,7 @@ JWT_SECRET=your-super-secret-jwt-key-change-in-production
 JWT_EXPIRES_IN=24h
 
 # Database Configuration (when AUTH_MODE=database)
-DB_HOST=mariadb.data.svc.cluster.local
+DB_HOST=mariadb-service.data.svc.cluster.local
 DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=your-mariadb-password

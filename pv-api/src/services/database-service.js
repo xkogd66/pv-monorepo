@@ -61,6 +61,9 @@ class Database {
   // Check if database is up and running
   async isHealthy() {
     if (!this.isInitialized || !this.pool) {
+      // Pool never came up (initialize() threw at startup). Without this the
+      // health check reports a bare failure with no reason at all.
+      debugDBService("Database not initialized — pool was never created");
       return false;
     }
 
