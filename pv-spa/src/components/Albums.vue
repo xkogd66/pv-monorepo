@@ -1,17 +1,24 @@
 <template>
   <div class="max-w-[1200px] mx-auto px-4 py-8">
-    <div class="flex flex-wrap justify-between items-end gap-4 mb-9">
-      <div>
-        <h1 class="text-2xl font-semibold tracking-tight text-gray-900">Albums</h1>
-        <p class="mt-1.5 text-sm text-gray-500 tabular-nums">{{ summaryLine }}</p>
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8 sm:mb-9">
+      <div class="flex items-end justify-between gap-4">
+        <div class="min-w-0">
+          <h1 class="text-2xl font-semibold tracking-tight text-gray-900">Albums</h1>
+          <p class="mt-1.5 text-xs sm:text-sm text-gray-500 tabular-nums">{{ summaryLine }}</p>
+        </div>
+        <!-- Create: icon-only on phone, labelled from sm up -->
+        <button v-if="canCreateAlbum" @click="showCreateDialog = true" title="New album"
+          class="sm:hidden flex-none w-11 h-11 flex items-center justify-center bg-blue-600 text-white rounded-lg transition hover:bg-blue-700">
+          <i class="fas fa-plus"></i>
+        </button>
       </div>
 
-      <div class="flex items-center gap-2 flex-wrap">
+      <div class="flex items-center gap-2">
         <select
           v-if="!loading && !error && availableYears.length > 0"
           v-model="selectedYear"
           title="Filter albums by year"
-          class="h-[34px] px-2.5 text-[13px] border border-gray-200 rounded-md bg-white text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+          class="flex-1 sm:flex-none min-w-0 h-11 sm:h-[34px] px-2.5 text-sm sm:text-[13px] border border-gray-200 rounded-lg sm:rounded-md bg-white text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
         >
           <option :value="null">All years</option>
           <option v-for="y in availableYears" :key="y" :value="y">{{ y }}</option>
@@ -21,7 +28,7 @@
           v-if="!loading && !error && albums.length > 0"
           v-model="sortOrder"
           title="Sort albums"
-          class="h-[34px] px-2.5 text-[13px] border border-gray-200 rounded-md bg-white text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+          class="flex-1 sm:flex-none min-w-0 h-11 sm:h-[34px] px-2.5 text-sm sm:text-[13px] border border-gray-200 rounded-lg sm:rounded-md bg-white text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
         >
           <option value="date-desc">Newest first</option>
           <option value="date-asc">Oldest first</option>
@@ -30,12 +37,12 @@
         </select>
 
         <button @click="refreshAlbums" :disabled="loading" title="Refresh albums"
-          class="w-[34px] h-[34px] flex items-center justify-center border border-gray-200 rounded-md bg-white text-gray-600 text-[13px] transition hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed">
+          class="flex-none w-11 h-11 sm:w-[34px] sm:h-[34px] flex items-center justify-center border border-gray-200 rounded-lg sm:rounded-md bg-white text-gray-600 text-[13px] transition hover:bg-gray-50 disabled:opacity-60 disabled:cursor-not-allowed">
           <i class="fas fa-sync-alt" :class="{ 'fa-spin': loading }"></i>
         </button>
 
         <button v-if="canCreateAlbum" @click="showCreateDialog = true"
-          class="h-[34px] px-3.5 bg-blue-600 text-white rounded-md text-[13px] font-semibold transition hover:bg-blue-700 whitespace-nowrap">
+          class="hidden sm:flex items-center h-[34px] px-3.5 bg-blue-600 text-white rounded-md text-[13px] font-semibold transition hover:bg-blue-700 whitespace-nowrap">
           <i class="fas fa-plus mr-1.5"></i>New album
         </button>
       </div>
@@ -58,7 +65,7 @@
 
     <!-- Albums Grid -->
     <div v-if="!loading && !error">
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-8">
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-5 sm:gap-x-6 sm:gap-y-8">
         <AlbumCard
           v-for="album in paginatedAlbums"
           :key="album.name"

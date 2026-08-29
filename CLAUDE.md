@@ -151,7 +151,7 @@ Non-sensitive vars live in ConfigMaps per service under `k8s/base/<service>/conf
 |---|---|---|
 | POST | `/auth/login` | JWT login (with Turnstile CAPTCHA) |
 | POST | `/auth/register` | User registration |
-| GET | `/albums` | List albums (includes `year`, `month`, `fileCount` metadata) |
+| GET | `/albums` | List albums (includes `year`, `month`, `fileCount`, `coverThumbnailUrl`) |
 | POST | `/album/:folderPath` | Create album with optional `month`/`year` metadata (admin) |
 | PUT | `/album/:currentName` | Rename and/or edit album metadata — `name`, `description`, `month`, `year` (admin) |
 | DELETE | `/buckets/:bucketName/folders` | Delete album and its photos (admin) |
