@@ -355,3 +355,81 @@ The `albums.counter` column in MariaDB caches the photo count per album and is u
 **Root cause of past counter bug (fixed):** The Temporal workflow was setting `completedAt` after the image loop but never calling `reportProgress` with that final state. The API only increments the counter when `state === 'complete'`, so the counter was never updated for bulk uploads. Fixed in `image-batch-workflow.ts` by adding a final `reportProgress` call after `completedAt` is set.
 
 **Do not** count objects from the per-album metadata JSON (`<folder>/<folder>.json`) to derive the counter — the JSON may contain entries for files that no longer exist in MinIO, or for original files that were converted and replaced. Count actual MinIO objects instead.
+
+---
+
+## Album Cover (`albums.cover`)
+
+The `albums.cover` column holds the **filename only** of the album's cover thumbnail
+(e.g. `IMG_1234.webp`) — never a full path. `GET /albums` composes the object name as
+`<album.name>/thumbs/<album.cover>` and returns a presigned `coverThumbnailUrl`.
+
+Storing a bare filename rather than a path is deliberate: `renameAlbum` copies MinIO
+objects to a new prefix, so a stored path would go stale on every rename while a
+filename survives it.
+
+**Schema:**
+
+```sql
+ALTER TABLE albums ADD COLUMN cover VARCHAR(255) NULL AFTER counter;
+```
+
+**How it is set:**
+- Bulk upload (`temporalUploads.js`): in the same `state === 'complete'` block that
+  increments `counter`, `body.lastFile` has its extension swapped for `.webp` and is
+  written via `setAlbumCoverIfEmpty()`. The "only if empty" test lives in the query's
+  `WHERE cover IS NULL`, so concurrent uploads cannot race — the first one wins and
+  later ones are no-ops.
+- Backfill (`albums.js` `backfillCover`): an album with `counter > 0` but no `cover`
+  gets one MinIO list of `<album>/thumbs/` on the next `GET /albums`, and the first
+  object found is persisted. This is marked `ponytail:` and is **meant to be deleted**
+  once every album has a cover — it is the one thing that reintroduces the N-list-calls
+  cost that `counter` exists to avoid, and it does so exactly once per album.
+
+**Presigning:** use `publicMinioClient`, not `minioClient` — same rule as everywhere
+else that hands a URL to a browser. Presigning is local HMAC with no network call, so
+doing it once per album in `GET /albums` is cheap.
+
+**Known gap:** deleting the photo that is an album's cover leaves `cover` pointing at a
+missing object. `AlbumCard.vue` degrades quietly (the `@error` handler falls back to a
+neutral placeholder), so nothing breaks visibly, but the album keeps no cover until
+something resets it. `deleteObjects` does not currently null the column.
+
+---
+
+## Album Grid (`AlbumCard.vue` / `Albums.vue`)
+
+Redesigned 2026-08-28 from centred icon-tiles to a cover-led grid.
+
+**Card anatomy:** a 4:3 cover (`aspect-[4/3]`, `rounded-lg`, `object-cover`) with the
+caption beneath — name on one truncated line, then a single metadata line
+(`36 photos · 2026`). There is no card border, no shadow and no `lastModified` on the
+card face; the modified date remains available through sorting. Long album names
+truncate rather than wrap — that is what keeps grid rows the same height.
+
+**Three cover states**, in `AlbumCard.vue`: the presigned photo; a dashed "No photos
+yet" block when `fileCount` is 0; a neutral `fa-images` glyph when a cover URL exists
+but 404s (`coverFailed`).
+
+**Toolbar:** an `Albums` heading with a live count (`summaryLine`, which counts what
+the year filter is actually showing), then one year `<select>`, one sort `<select>`
+(four options, replacing four buttons), an icon-only refresh, and "New album".
+
+**Responsive rules that matter:**
+- Grid is `grid-cols-2 md:grid-cols-3 lg:grid-cols-4`. Two columns on phone is
+  deliberate — with full-bleed 4:3 covers, one column is roughly one album per screen.
+- Controls are `h-11` (44px) on phone and `sm:h-[34px]` on pointer devices. Do not let
+  the phone size drop below 44px.
+- Edit/delete exist **twice**: `hidden md:flex` hover buttons on the cover, and a
+  `md:hidden` dots button in the caption that opens a `<Teleport>`ed bottom sheet.
+  There is no hover on touch, so the hover buttons alone are unreachable there.
+
+**Known gap:** the touch/pointer split is a width breakpoint (`md`), not a capability
+test, so a touch tablet at ≥768px gets the hover-only buttons and cannot reach them.
+The correct test is `@media (hover: hover)`, which needs a custom variant in
+`tailwind.config.js` (Tailwind 3.4 has no built-in one). The bottom sheet also does not
+lock body scroll.
+
+**Unverified:** the action sheet's behaviour (teleport, scrim dismissal, the emit path
+back to `openEditDialog` / `confirmDelete`) has been built and compiles, but has not
+been exercised on a real touch device.
