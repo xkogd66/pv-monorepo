@@ -18,6 +18,12 @@ Do not attempt to visually verify UI changes yourself (screenshots, headless bro
 
 ---
 
+## Explain Reasoning
+
+Always explain the reasoning behind a change before or alongside making it — not just what was edited, but what problem it solves, why this approach over alternatives, and any capability or behavior being traded away (especially when removing/replacing existing functionality). Don't let a removed capability surface later as a bug report — flag it up front.
+
+---
+
 ## Repository Structure
 
 | Directory | Role | Language/Framework |

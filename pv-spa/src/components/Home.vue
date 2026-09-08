@@ -42,20 +42,12 @@
       >
         Your photos, organized and always within reach.
       </p>
-      <div class="flex gap-4 justify-center flex-wrap">
-        <button
-          class="px-6 py-3 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md transition"
-          @click="$emit('login')"
-        >
-          Log In
-        </button>
-        <button
-          class="px-6 py-3 rounded-md bg-white/90 hover:bg-white text-gray-800 font-semibold shadow-md transition"
-          @click="$emit('register')"
-        >
-          Create Account
-        </button>
-      </div>
+      <button
+        class="px-6 py-3 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md transition"
+        @click="$emit('navigate', 'albums')"
+      >
+        Browse Galleries
+      </button>
     </div>
   </section>
 </template>
@@ -64,25 +56,17 @@
 import { ref, onMounted } from 'vue'
 import apiService from '../services/api.js'
 
-defineEmits(['login', 'register'])
+defineEmits(['navigate'])
 
 const heroThumbs = ref([])
 
-// ponytail: stops at the first album that has thumbnails; if the gallery
-// grows a lot of empty albums this becomes a slow scan — swap for a
-// dedicated "sample photos" endpoint if that happens.
 onMounted(async () => {
   try {
     const { albums = [] } = await apiService.getAlbums()
-    for (const album of albums) {
-      const res = await apiService.getAlbumContents(album.name)
-      const objects = res?.album?.objects || res?.objects || []
-      const thumbs = objects.map((o) => o.thumbnailUrl).filter(Boolean)
-      if (thumbs.length) {
-        heroThumbs.value = thumbs.slice(0, 12)
-        break
-      }
-    }
+    heroThumbs.value = albums
+      .map((a) => a.coverThumbnailUrl)
+      .filter(Boolean)
+      .slice(0, 12)
   } catch {
     // silent fallback to the gradient-only hero
   }

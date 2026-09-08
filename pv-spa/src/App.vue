@@ -18,11 +18,7 @@
 
     <!-- Main content -->
     <main class="px-2 sm:px-4 py-4 sm:py-6">
-      <Home
-        v-if="currentView === 'home'"
-        @login="handleLoginTrigger"
-        @register="handleRegisterTrigger"
-      />
+      <Home v-if="currentView === 'home'" @navigate="handleNavigation" />
       <Albums
         v-else-if="currentView === 'albums'"
         @navigate="handleNavigation"
