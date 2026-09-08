@@ -14,11 +14,14 @@ const VIDEO_EXT = /\.(mp4|mov|avi|mkv|webm|m4v|3gp|flv|wmv)$/i;
 // pv-metadata's reverse-geocode result is a Mapbox place_name, most-specific
 // segment first — e.g. "Carrer Del Poeta Cabanyes 50, 08004 Barcelona,
 // Barcelona, Spain". The country is reliably the last comma-separated part.
-// "not found" means no GPS EXIF, no MAPBOX_TOKEN at upload time, or a failed
-// geocode — nothing to attribute a country to, so it's skipped rather than
-// counted as "unknown".
+// These sentinel strings all mean "no resolvable address" — no GPS EXIF, no
+// MAPBOX_TOKEN at upload time, a failed geocode, or (the last two) leftover
+// values from an older version of the pipeline that isn't in the codebase
+// anymore but is still baked into old albums' metadata JSON. None of them
+// name a country, so skip rather than count as "unknown".
+const NO_LOCATION = new Set(['not found', 'not captured', 'address not found']);
 function extractCountry(location) {
-    if (!location || location === 'not found') return null;
+    if (!location || NO_LOCATION.has(location.trim().toLowerCase())) return null;
     const parts = location.split(',').map((s) => s.trim()).filter(Boolean);
     return parts.length ? parts[parts.length - 1] : null;
 }
@@ -87,11 +90,14 @@ const getStats = (minioClient) => async (req, res) => {
         }
 
         // One GetObject per album's metadata JSON (already-computed location
-        // strings, no new geocoding) — cheap next to the listing above since
-        // this only runs once per popover open, not polled.
+        // strings, no new geocoding) — run concurrently so a cold cache (the
+        // first request after the 5-minute TTL expires) costs roughly one
+        // round trip, not 90+ of them back to back.
         const photosByCountry = {};
-        for (const folder of folderSet) {
-            const media = await readAlbumMedia(minioClient, bucketName, folder);
+        const albumMediaLists = await Promise.all(
+            Array.from(folderSet, (folder) => readAlbumMedia(minioClient, bucketName, folder)),
+        );
+        for (const media of albumMediaLists) {
             for (const item of media) {
                 const country = extractCountry(item.location);
                 if (country) photosByCountry[country] = (photosByCountry[country] || 0) + 1;
