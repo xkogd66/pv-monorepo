@@ -156,6 +156,7 @@ Non-sensitive vars live in ConfigMaps per service under `k8s/base/<service>/conf
 | Method | Path | Description |
 |---|---|---|
 | POST | `/auth/login` | JWT login (with Turnstile CAPTCHA) |
+| GET | `/auth/user` | Validate bearer token, return current user (used by the SPA on init/refresh to restore a session) |
 | POST | `/auth/register` | User registration |
 | GET | `/albums` | List albums (includes `year`, `month`, `fileCount`, `coverThumbnailUrl`) |
 | POST | `/album/:folderPath` | Create album with optional `month`/`year` metadata (admin) |

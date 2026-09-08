@@ -3,6 +3,7 @@
 const express = require("express");
 const {
   AuthService,
+  authenticateToken,
 } = require("../middleware/authMW");
 const router = express.Router();
 const debug = require("debug");
@@ -132,6 +133,20 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// ... rest of your existing routes remain unchanged ...
+// GET /auth/user - validate the bearer token and return the current user
+// (used by the SPA on init/refresh to restore a session without re-login)
+router.get("/user", authenticateToken, (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      user: {
+        id: req.user.id,
+        username: req.user.username,
+        email: req.user.email,
+        role: req.user.role,
+      },
+    },
+  });
+});
 
 module.exports = router;
