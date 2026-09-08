@@ -7,15 +7,18 @@ const config = require('../config'); // defaults to ./config/index.js
 const router = express.Router();
 
 
-// GET /stats - Returns statistics for the bucket
+// Same extension lists AlbumViewer.vue uses to split a photo grid from a video grid.
+const PHOTO_EXT = /\.(avif|jpe?g|png|gif|heic)$/i;
+const VIDEO_EXT = /\.(mp4|mov|avi|mkv|webm|m4v|3gp|flv|wmv)$/i;
+
+// GET /stats - Returns gallery-wide totals for the Statistics popover
 const getStats = (minioClient) => async (req, res) => {
     try {
         const bucketName = config.minio.bucketName;
-        let fileCount = 0;
+        let totalPhotos = 0;
+        let totalVideos = 0;
         let totalSize = 0;
         const folderSet = new Set();
-        const fileTypeCounts = {};
-        const folderTypeCounts = {};
 
         // ponytail: 400 keys/page keeps each page's XML under the minio SDK's
         // bundled fast-xml-parser entity-expansion cap (1000 per document) --
@@ -29,26 +32,17 @@ const getStats = (minioClient) => async (req, res) => {
             const result = await minioClient.listObjectsV2Query(bucketName, '', continuationToken, '', PAGE_SIZE, '');
 
             for (const obj of result.objects) {
-                if (obj.name && !obj.name.endsWith('/')) {
-                    fileCount++;
-                    totalSize += obj.size || 0;
-                    const pathParts = obj.name.split('/');
-                    const folder = pathParts.length > 1 ? pathParts[0] : '';
-                    if (folder) folderSet.add(folder);
+                if (!obj.name || obj.name.endsWith('/')) continue;
 
-                    // Get file extension
-                    const extMatch = obj.name.match(/\.([a-zA-Z0-9]+)$/);
-                    const ext = extMatch ? extMatch[1].toLowerCase() : 'unknown';
+                totalSize += obj.size || 0;
+                const folder = obj.name.split('/')[0];
+                if (folder) folderSet.add(folder);
 
-                    // Count file types globally
-                    fileTypeCounts[ext] = (fileTypeCounts[ext] || 0) + 1;
-
-                    // Count file types per folder
-                    if (folder) {
-                        if (!folderTypeCounts[folder]) folderTypeCounts[folder] = {};
-                        folderTypeCounts[folder][ext] = (folderTypeCounts[folder][ext] || 0) + 1;
-                    }
-                }
+                // Thumbnails and per-album metadata JSON are storage artifacts,
+                // not photos/videos — don't let them inflate the counts.
+                if (obj.name.includes('/thumbs/')) continue;
+                if (PHOTO_EXT.test(obj.name)) totalPhotos++;
+                else if (VIDEO_EXT.test(obj.name)) totalVideos++;
             }
 
             isTruncated = result.isTruncated;
@@ -57,12 +51,10 @@ const getStats = (minioClient) => async (req, res) => {
 
         res.json({
             success: true,
-            bucket: bucketName,
-            fileCount,
+            totalPhotos,
+            totalVideos,
+            totalAlbums: folderSet.size,
             totalSize,
-            uniqueFolders: Array.from(folderSet),
-            fileTypeCounts,
-            folderTypeCounts,
         });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });

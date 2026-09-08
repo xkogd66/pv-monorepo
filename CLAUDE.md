@@ -269,6 +269,8 @@ Shown only when the visitor is unauthenticated — `App.vue` routes to `home` on
 
 Gallery statistics (`BucketStats.vue`) live in the top nav, not on the landing page. Gated on `isAuthenticated` (any logged-in user, not just admins) — a "Statistics" button in the desktop nav toggles a popover anchored to it (same pattern as the health-status dot), and the mobile menu gets an inline expand/collapse toggle instead (popovers don't work well on mobile). `BucketStats.vue` is self-contained and fetches its own data — no props needed beyond the existing `noBorder` styling flag.
 
+`GET /stats` (`pv-api/src/routes/stats.js`) returns four totals only — `totalPhotos`, `totalVideos`, `totalAlbums`, `totalSize` — rendered as a 2x2 tile grid. It used to also return a raw per-extension breakdown and a giant per-album `.avif`-count table; both were dropped (no other consumer existed) because they dumped storage internals (`.json`/`.webp` artifact counts) at the user and the per-album table overflowed the popover. `totalPhotos`/`totalVideos` are counted with the same extension regexes `AlbumViewer.vue` uses to split its photo/video grids, and explicitly skip anything under `/thumbs/` — a thumbnail or metadata JSON is a storage artifact, not a photo. `totalSize`, by contrast, is the literal sum of every object's bytes (thumbnails included) since it's meant to answer "how much MinIO storage am I using," not "how many photos do I have."
+
 ## Photo Grid (`PhotoGrid.vue`)
 
 - Renders a slice of the full photo array (`itemsPerPage: 24` default); all photos are fetched at once from the API.

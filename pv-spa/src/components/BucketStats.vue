@@ -10,39 +10,10 @@
       <button class="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200" @click="fetchStats">Retry</button>
     </div>
 
-    <div v-else class="space-y-4">
-      <!-- General Stats Block -->
-      <div class="px-4 py-3 w-fit mx-auto text-left text-sm md:text-lg space-y-1">
-        <div><span class="text-gray-500">Gallery Size:</span> <span class="text-gray-800">{{ formatSize(stats.totalSize) }}</span></div>
-        <div><span class="text-gray-500">Total Files:</span> <span class="text-gray-800">{{ stats.fileCount }}</span></div>
-        <div class="pt-1 text-gray-600 font-medium text-sm md:text-base">Total File Types </div>
-        <div class="flex flex-wrap gap-2 pt-1 text-sm md:text-base">
-          <span v-for="(count, type) in stats.fileTypeCounts" :key="type" class="text-gray-700">
-            .{{ type }} <span class="font-semibold">({{ count }})</span>
-          </span>
-        </div>
-      </div>
-
-      <!-- Table -->
-      <div class="w-fit mx-auto">
-        <table class="text-sm md:text-base text-gray-800 border border-gray-200">
-          <thead class="bg-gray-50 text-gray-600">
-            <tr>
-              <th class="px-3 py-2 border-b border-gray-200 text-left">Album</th>
-              <th class="px-3 py-2 border-b border-gray-200 text-right">.avif</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="(types, folder) in stats.folderTypeCounts"
-              :key="folder"
-              class="border-t border-gray-100"
-            >
-              <td class="px-3 py-2 text-left whitespace-nowrap">{{ folder }}</td>
-              <td class="px-3 py-2 text-right text-blue-600 font-semibold">{{ types.avif ?? 0 }}</td>
-            </tr>
-          </tbody>
-        </table>
+    <div v-else class="grid grid-cols-2 gap-3">
+      <div v-for="tile in tiles" :key="tile.label" class="px-4 py-3 rounded-lg bg-gray-50 border border-gray-100 text-center">
+        <div class="text-lg md:text-xl font-semibold text-gray-900 tabular-nums">{{ tile.value }}</div>
+        <div class="text-xs md:text-sm text-gray-500">{{ tile.label }}</div>
       </div>
     </div>
   </div>
@@ -50,7 +21,7 @@
 
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 const props = defineProps({ noBorder: Boolean })
 import apiService from '../services/api.js'
 
@@ -64,6 +35,13 @@ function formatSize(bytes) {
   if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
   return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB'
 }
+
+const tiles = computed(() => [
+  { label: 'Total Photos', value: (stats.value.totalPhotos ?? 0).toLocaleString() },
+  { label: 'Total Videos', value: (stats.value.totalVideos ?? 0).toLocaleString() },
+  { label: 'Total Albums', value: (stats.value.totalAlbums ?? 0).toLocaleString() },
+  { label: 'Gallery Size', value: formatSize(stats.value.totalSize ?? 0) },
+])
 
 async function fetchStats() {
   loading.value = true
