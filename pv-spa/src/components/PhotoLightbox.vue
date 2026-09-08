@@ -75,13 +75,21 @@
             >
               <i class="fas fa-trash"></i>
             </button>
-            <button 
+            <button
               v-if="canShowEditButton"
               @click="showMetadataEditor = true"
-              class="bg-white bg-opacity-10 text-white w-10 h-10 rounded-full text-base flex items-center justify-center transition-all duration-200 backdrop-blur-sm hover:bg-opacity-20 hover:scale-110" 
+              class="bg-white bg-opacity-10 text-white w-10 h-10 rounded-full text-base flex items-center justify-center transition-all duration-200 backdrop-blur-sm hover:bg-opacity-20 hover:scale-110"
               title="Edit Metadata"
             >
               <i class="fas fa-edit"></i>
+            </button>
+            <button
+              v-if="canShowCoverButton"
+              @click.stop="$emit('set-cover', currentPhoto)"
+              class="bg-white bg-opacity-10 text-white w-10 h-10 rounded-full text-base flex items-center justify-center transition-all duration-200 backdrop-blur-sm hover:bg-opacity-20 hover:scale-110"
+              title="Set as Album Cover"
+            >
+              <i class="fas fa-image"></i>
             </button>
           </div>
         </div>
@@ -143,7 +151,7 @@ const props = defineProps({
 })
 
 // Emits
-const emit = defineEmits(['close', 'next-photo', 'previous-photo', 'delete-photo'])
+const emit = defineEmits(['close', 'next-photo', 'previous-photo', 'delete-photo', 'set-cover'])
 
 // Local state
 const imageLoaded = ref(false)
@@ -159,6 +167,11 @@ const canShowDeleteButton = computed(() => {
 
 const canShowEditButton = computed(() => {
   return authService.isAuthenticated() && authService.canPerformAction('edit_metadata')
+})
+
+// Same gate Albums.vue uses for rename/edit-album — cover is an album-level edit.
+const canShowCoverButton = computed(() => {
+  return authService.isAuthenticated() && authService.canPerformAction('delete_album')
 })
 
 // Watch for photo changes

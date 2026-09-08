@@ -1,7 +1,7 @@
 // routes/albums.js
 const express = require("express");
 const router = express.Router();
-const { authenticateToken, requireRole } = require("../middleware/authMW");
+const { authenticateToken, authenticateOptional, requireRole } = require("../middleware/authMW");
 
 const database = require("../services/database-service");
 const { getAddressFromCoordinates } = require("../services/metadata-service");
@@ -56,7 +56,9 @@ async function backfillCover(album) {
 
 const getAlbums = (minioClient, publicMinioClient) => async (req, res) => {
   try {
-    const albums = await database.getAllAlbums();
+    const allAlbums = await database.getAllAlbums();
+    // Anonymous requests never see private albums, not even in a count.
+    const albums = req.user ? allAlbums : allAlbums.filter((a) => !a.is_private);
     const presignedExpiry = 3600; // 1 hour
 
     const albumMetadata = await Promise.all(
@@ -77,6 +79,7 @@ const getAlbums = (minioClient, publicMinioClient) => async (req, res) => {
           fileCount: album.counter || 0,
           year: album.year ?? null,
           month: album.month ?? null,
+          isPrivate: !!album.is_private,
           coverThumbnailUrl,
         };
       }),
@@ -93,7 +96,7 @@ const getAlbums = (minioClient, publicMinioClient) => async (req, res) => {
 const createAlbum = (minioClient) => async (req, res) => {
   try {
     const { folderPath } = req.params;
-    const { description, month, year } = req.body;
+    const { description, month, year, isPrivate } = req.body;
 
     // Clean the folder path: remove leading/trailing slashes, then ensure it ends with /
     let cleanPath = folderPath.trim();
@@ -165,6 +168,9 @@ const createAlbum = (minioClient) => async (req, res) => {
       description: description || "",
       month: month || null,
       year: year || null,
+      // Defaults to private (matches the albums.is_private column default);
+      // only an explicit `false` creates a public album.
+      isPrivate: isPrivate !== false,
     });
 
     res.status(201).json({
@@ -270,7 +276,10 @@ const getPhotos = (minioClient, publicMinioClient) => async (req, res) => {
 
     const album = await database.getAlbumByName(name);
 
-    if (!album) {
+    // Treat a private album as not found for anonymous requests — same
+    // response as a nonexistent album, so listing can't be used to confirm
+    // a private album's existence.
+    if (!album || (album.is_private && !req.user)) {
       return res.status(404).json({
         success: false,
         error: "Album not found",
@@ -366,7 +375,7 @@ const getObject = (minioClient) => async (req, res) => {
 
     const album = await database.getAlbumByName(name);
     let pathFromName = name + "/";
-    if (!album) {
+    if (!album || (album.is_private && !req.user)) {
       return res.status(404).json({ success: false, error: "Album not found" });
     }
 
@@ -610,7 +619,7 @@ const updatePhotoMetadata = (minioClient) => async (req, res) => {
 const renameAlbum = (minioClient) => async (req, res) => {
   try {
     const { currentName } = req.params;
-    const { newName, description, month, year } = req.body;
+    const { newName, description, month, year, cover, isPrivate } = req.body;
 
     // Check if album exists
     const album = await database.getAlbumByName(currentName);
@@ -633,6 +642,14 @@ const renameAlbum = (minioClient) => async (req, res) => {
     const nextDescription = description !== undefined ? description : album.description;
     const nextMonth = month !== undefined ? normalizeInt(month) : album.month;
     const nextYear = year !== undefined ? normalizeInt(year) : album.year;
+    // Cover is stored as a bare thumbnail filename (see Album Cover docs) — a
+    // manual pick here overwrites unconditionally, unlike the upload-time
+    // auto-cover which only fires while the column is still empty.
+    const nextCover =
+      cover !== undefined
+        ? String(cover).trim().replace(/\.avif$/i, ".webp") || null
+        : undefined;
+    const nextIsPrivate = isPrivate !== undefined ? !!isPrivate : undefined;
 
     if (!isRename) {
       // Metadata-only update — no storage movement required.
@@ -640,6 +657,8 @@ const renameAlbum = (minioClient) => async (req, res) => {
         description: nextDescription,
         month: nextMonth,
         year: nextYear,
+        cover: nextCover,
+        isPrivate: nextIsPrivate,
       });
       if (!updateResult) {
         return res.status(500).json({
@@ -655,6 +674,8 @@ const renameAlbum = (minioClient) => async (req, res) => {
           description: nextDescription,
           month: nextMonth,
           year: nextYear,
+          cover: nextCover,
+          isPrivate: nextIsPrivate,
         },
       });
     }
@@ -767,6 +788,8 @@ const renameAlbum = (minioClient) => async (req, res) => {
         description: nextDescription,
         month: nextMonth,
         year: nextYear,
+        cover: nextCover,
+        isPrivate: nextIsPrivate,
       });
 
       if (!updateResult) {
@@ -812,10 +835,10 @@ const renameAlbum = (minioClient) => async (req, res) => {
 
 // Consolidate the module.exports into a single export
 module.exports = (minioClient, { publicMinioClient = null } = {}) => {
-  router.get("/albums", getAlbums(minioClient, publicMinioClient));
-  router.get("/album/:name", getPhotos(minioClient, publicMinioClient));
-  router.get("/objects/:name", getPhotos(minioClient, publicMinioClient));
-  router.get("/albums/:name/object/:object", getObject(minioClient));
+  router.get("/albums", authenticateOptional, getAlbums(minioClient, publicMinioClient));
+  router.get("/album/:name", authenticateOptional, getPhotos(minioClient, publicMinioClient));
+  router.get("/objects/:name", authenticateOptional, getPhotos(minioClient, publicMinioClient));
+  router.get("/albums/:name/object/:object", authenticateOptional, getObject(minioClient));
   router.delete(
     "/buckets/:bucketName/folders",
     authenticateToken,

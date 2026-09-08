@@ -251,7 +251,7 @@ class Database {
   // ========================= ALBUM METHODS =========================
 
   // Create new album
-  async createAlbum({ name, path, description = null, month = null, year = null }) {
+  async createAlbum({ name, path, description = null, month = null, year = null, isPrivate = true }) {
     const connection = await this.pool.getConnection();
     try {
       // Check if album with this path already exists
@@ -271,8 +271,8 @@ class Database {
 
       // Insert album with slug, created_at, and updated_at to satisfy NOT NULL constraints
       const [result] = await connection.execute(
-        "INSERT INTO albums (name, slug, path, description, month, year, counter, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [name, initialSlug, path, description, month, year, 0, now, now]
+        "INSERT INTO albums (name, slug, path, description, month, year, counter, is_private, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [name, initialSlug, path, description, month, year, 0, isPrivate ? 1 : 0, now, now]
       );
 
       const albumId = result.insertId;
@@ -300,7 +300,7 @@ class Database {
     const connection = await this.pool.getConnection();
     try {
       const [rows] = await connection.execute(
-        "SELECT id, name, slug, path, description, created_at, updated_at FROM albums WHERE TRIM(name) = TRIM(?)",
+        "SELECT id, name, slug, path, description, is_private, created_at, updated_at FROM albums WHERE TRIM(name) = TRIM(?)",
         [name]
       );
 
@@ -345,7 +345,7 @@ class Database {
     const connection = await this.pool.getConnection();
     try {
       const [rows] = await connection.execute(
-        "SELECT name, slug, path, description, counter, cover, year, month, created_at, updated_at FROM albums ORDER BY created_at DESC"
+        "SELECT name, slug, path, description, counter, cover, year, month, is_private, created_at, updated_at FROM albums ORDER BY created_at DESC"
       );
       return rows;
     } finally {
@@ -354,7 +354,7 @@ class Database {
   }
 
   // Update album
-  async updateAlbumDescription(albumId, { name, path, description, month, year }) {
+  async updateAlbumDescription(albumId, { name, path, description, month, year, cover, isPrivate }) {
     const connection = await this.pool.getConnection();
     try {
       // If name is being updated, we might want to update the slug too
@@ -385,6 +385,16 @@ class Database {
       if (year !== undefined) {
         updateQuery += ", year = ?";
         params.push(year);
+      }
+
+      if (cover !== undefined) {
+        updateQuery += ", cover = ?";
+        params.push(cover);
+      }
+
+      if (isPrivate !== undefined) {
+        updateQuery += ", is_private = ?";
+        params.push(isPrivate ? 1 : 0);
       }
 
       updateQuery += " WHERE id = ?";

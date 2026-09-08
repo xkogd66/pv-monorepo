@@ -127,6 +127,7 @@
       @next-photo="nextPhoto"
       @previous-photo="previousPhoto"
       @delete-photo="confirmDeletePhoto"
+      @set-cover="setCover"
     />
 
     <!-- Video Lightbox Viewer -->
@@ -570,6 +571,20 @@ const deletePhoto = async () => {
     error.value = `Failed to delete photo: ${err.message}`;
   } finally {
     deletingPhoto.value = false;
+  }
+};
+
+const setCover = async (photo) => {
+  if (!photo) return;
+  try {
+    const response = await apiService.updateAlbum(props.albumName, { cover: photo.name });
+    if (response.success) {
+      showToast('Album cover updated');
+    } else {
+      showToast(response.error || 'Failed to update album cover');
+    }
+  } catch (err) {
+    showToast(`Failed to update album cover: ${err.message}`);
   }
 };
 

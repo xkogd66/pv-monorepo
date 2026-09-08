@@ -124,6 +124,28 @@ const authenticateToken = async (req, res, next) => {
   }
 }
 
+// Like authenticateToken, but never rejects — sets req.user when a valid
+// token is present, otherwise leaves it unset and continues. Lets a single
+// route serve anonymous and authenticated callers differently (e.g. hiding
+// private albums from anonymous requests).
+const authenticateOptional = async (req, res, next) => {
+  const authHeader = req.headers['authorization']
+  const token = authHeader && authHeader.split(' ')[1]
+
+  if (!token) return next()
+
+  try {
+    const decoded = AuthService.verifyToken(token)
+    if (decoded) {
+      const user = await AuthService.getUserById(decoded.id)
+      if (user) req.user = user
+    }
+  } catch (error) {
+    console.error('Optional auth middleware error:', error.message)
+  }
+  next()
+}
+
 // Role-based authorization middleware
 const requireRole = (roles) => {
   return (req, res, next) => {
@@ -149,5 +171,6 @@ const requireRole = (roles) => {
 module.exports = {
   AuthService,
   authenticateToken,
+  authenticateOptional,
   requireRole
 }

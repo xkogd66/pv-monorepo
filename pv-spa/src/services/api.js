@@ -111,8 +111,8 @@ async request(endpoint, options = {}) {
     return this.request('/albums', options);
   }
 
-  async createFolder(folderPath, description = null, month = null, year = null) {
-    const body = { description, month, year };
+  async createFolder(folderPath, description = null, month = null, year = null, isPrivate = true) {
+    const body = { description, month, year, isPrivate };
     return this.request(`/album/${encodeURIComponent(folderPath)}`, {
       method: "POST",
       body: JSON.stringify(body),
@@ -134,6 +134,8 @@ async request(endpoint, options = {}) {
     if (changes.description !== undefined) body.description = changes.description;
     if (changes.month !== undefined) body.month = changes.month;
     if (changes.year !== undefined) body.year = changes.year;
+    if (changes.cover !== undefined) body.cover = changes.cover;
+    if (changes.isPrivate !== undefined) body.isPrivate = changes.isPrivate;
     return this.request(`/album/${encodeURIComponent(currentName)}`, {
       method: "PUT",
       body: JSON.stringify(body),

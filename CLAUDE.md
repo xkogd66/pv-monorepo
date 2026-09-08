@@ -158,11 +158,11 @@ Non-sensitive vars live in ConfigMaps per service under `k8s/base/<service>/conf
 | POST | `/auth/login` | JWT login (with Turnstile CAPTCHA) |
 | GET | `/auth/user` | Validate bearer token, return current user (used by the SPA on init/refresh to restore a session) |
 | POST | `/auth/register` | User registration |
-| GET | `/albums` | List albums (includes `year`, `month`, `fileCount`, `coverThumbnailUrl`) |
-| POST | `/album/:folderPath` | Create album with optional `month`/`year` metadata (admin) |
-| PUT | `/album/:currentName` | Rename and/or edit album metadata — `name`, `description`, `month`, `year` (admin) |
+| GET | `/albums` | List albums (includes `year`, `month`, `fileCount`, `coverThumbnailUrl`, `isPrivate`); private albums omitted for anonymous callers |
+| POST | `/album/:folderPath` | Create album with optional `month`/`year`/`isPrivate` metadata (admin; defaults to private) |
+| PUT | `/album/:currentName` | Rename and/or edit album metadata — `name`, `description`, `month`, `year`, `cover`, `isPrivate` (admin) |
 | DELETE | `/buckets/:bucketName/folders` | Delete album and its photos (admin) |
-| GET | `/objects/:name` | List photos in an album (presigned URLs) |
+| GET | `/objects/:name` | List photos in an album (presigned URLs); 404 for anonymous callers on a private album |
 | POST | `/bulk/upload/:folder` | Image upload → Temporal workflow (returns 202 + batchId) |
 | POST | `/video/upload/:folder` | Video upload → Temporal workflow (returns 202 + batchId) |
 | GET | `/bulk/status/:workflowId` | Poll bulk workflow status |
@@ -404,6 +404,13 @@ ALTER TABLE albums ADD COLUMN cover VARCHAR(255) NULL AFTER counter;
   object found is persisted. This is marked `ponytail:` and is **meant to be deleted**
   once every album has a cover — it is the one thing that reintroduces the N-list-calls
   cost that `counter` exists to avoid, and it does so exactly once per album.
+- Manual pick (`PhotoLightbox.vue` → `AlbumViewer.vue` → `PUT /album/:currentName`
+  with `{ cover }`): a user with the same permission as album rename/edit
+  (`delete_album`) can pick any photo from the lightbox as the cover. The API swaps
+  `.avif` for `.webp` and writes the column via `updateAlbumDescription`, which
+  overwrites **unconditionally** — unlike `setAlbumCoverIfEmpty`, a manual pick is not
+  a one-time-only write, and a later pick (or a re-upload racing `setAlbumCoverIfEmpty`
+  before the manual pick lands) can change it again.
 
 **Presigning:** use `publicMinioClient`, not `minioClient` — same rule as everywhere
 else that hands a URL to a browser. Presigning is local HMAC with no network call, so
@@ -413,6 +420,38 @@ doing it once per album in `GET /albums` is cheap.
 missing object. `AlbumCard.vue` degrades quietly (the `@error` handler falls back to a
 neutral placeholder), so nothing breaks visibly, but the album keeps no cover until
 something resets it. `deleteObjects` does not currently null the column.
+
+---
+
+## Private Albums (`albums.is_private`)
+
+`albums.is_private` (`TINYINT(1) NOT NULL DEFAULT 1`) hides an album from
+unauthenticated visitors. Default is **private** — a newly created album (or an
+existing album right after the column was added) is invisible to anonymous users
+until someone explicitly makes it public.
+
+**Enforcement is at the pv-api layer, gated by `authenticateOptional`**
+(`middleware/authMW.js` — parses the bearer token if present and sets `req.user`,
+but never rejects a request for having no token, unlike `authenticateToken`):
+- `GET /albums`: private albums are filtered out of the list entirely for anonymous
+  requests (`req.user` unset).
+- `GET /album/:name`, `GET /objects/:name`, `GET /albums/:name/object/:object`: an
+  anonymous request against a private album gets the same 404 as a nonexistent
+  album — an anonymous caller cannot distinguish "doesn't exist" from "exists but
+  is private."
+- The gate is "any authenticated user," not admin-only — matches the existing
+  Statistics feature's gating. Toggling privacy itself is admin-only (same
+  `delete_album` permission as rename/edit, via `PUT /album/:currentName` with
+  `{ isPrivate }`).
+
+**Known limitation:** this blocks *discovery* through pv-api only. A presigned
+MinIO URL already handed to a browser (`coverThumbnailUrl`, `thumbnailUrl`,
+`presignedUrl` from a prior `GET /objects/:name` response) remains valid for its
+full 1-hour signature window regardless of a later privacy change — presigned URLs
+are signed independently of pv-api and MinIO has no way to revoke one early. Making
+an album private stops new anonymous requests from finding it; it does not revoke
+URLs already issued. Fully closing that gap would mean proxying all media through
+pv-api instead of presigned MinIO URLs — out of scope here.
 
 ---
 

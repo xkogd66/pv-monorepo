@@ -193,6 +193,12 @@
           <input id="editAlbumYear" v-model="editAlbumYear" type="number" placeholder="Enter year (e.g., 2025)" min="1900" max="2100"
             class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
         </div>
+        <div class="mb-6">
+          <label class="flex items-center gap-2 text-gray-800">
+            <input id="editAlbumPrivate" v-model="editAlbumPrivate" type="checkbox" class="w-4 h-4" />
+            Private (hidden from anonymous visitors)
+          </label>
+        </div>
         <div class="flex justify-end gap-4 flex-wrap sm:flex-nowrap">
           <button @click="closeEditDialog"
             class="bg-gray-100 text-gray-800 border border-gray-300 px-4 py-3 rounded-md text-sm transition hover:bg-gray-200 min-w-[80px]">
@@ -229,6 +235,7 @@ const editAlbumName = ref('')
 const editAlbumDescription = ref('')
 const editAlbumMonth = ref('')
 const editAlbumYear = ref('')
+const editAlbumPrivate = ref(true)
 const creating = ref(false)
 const deleting = ref(false)
 const saving = ref(false)
@@ -332,6 +339,7 @@ const loadAlbums = async () => {
           month: album.month ?? null,
           description: album.description ?? '',
           coverThumbnailUrl: album.coverThumbnailUrl ?? null,
+          isPrivate: album.isPrivate ?? false,
 
         }
       })
@@ -358,7 +366,7 @@ const handleCreateAlbum = async (albumData) => {
   error.value = null
 
   try {
-    const response = await apiService.createFolder(albumData.name, albumData.description, albumData.month, albumData.year)
+    const response = await apiService.createFolder(albumData.name, albumData.description, albumData.month, albumData.year, albumData.isPrivate)
 
     if (response.success) {
       closeCreateDialog()
@@ -423,6 +431,7 @@ const openEditDialog = (album) => {
   editAlbumDescription.value = album.description || ''
   editAlbumMonth.value = album.month ? String(album.month).padStart(2, '0') : ''
   editAlbumYear.value = album.year ? String(album.year) : ''
+  editAlbumPrivate.value = album.isPrivate ?? true
   showEditDialog.value = true
 }
 
@@ -438,6 +447,7 @@ const saveAlbum = async () => {
       description: editAlbumDescription.value.trim() || null,
       month: editAlbumMonth.value ? parseInt(editAlbumMonth.value, 10) : null,
       year: editAlbumYear.value ? parseInt(editAlbumYear.value, 10) : null,
+      isPrivate: editAlbumPrivate.value,
     }
 
     const response = await apiService.updateAlbum(albumToEdit.value.name, changes)
@@ -473,6 +483,7 @@ const closeEditDialog = () => {
   editAlbumDescription.value = ''
   editAlbumMonth.value = ''
   editAlbumYear.value = ''
+  editAlbumPrivate.value = true
   saving.value = false
 }
 

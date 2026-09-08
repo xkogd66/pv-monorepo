@@ -45,7 +45,9 @@
     <!-- Caption -->
     <div class="flex items-start gap-1 mt-2.5">
       <div class="min-w-0 flex-1">
-        <h3 class="text-[13px] sm:text-sm font-semibold text-gray-900 truncate" :title="displayName">{{ displayName }}</h3>
+        <h3 class="text-[13px] sm:text-sm font-semibold text-gray-900 truncate" :title="displayName">
+          <i v-if="album.isPrivate" class="fas fa-lock text-[10px] text-gray-400 mr-1" title="Private album"></i>{{ displayName }}
+        </h3>
         <p class="mt-0.5 text-[11px] sm:text-xs text-gray-500 tabular-nums">{{ metaLine }}</p>
       </div>
       <!-- Touch equivalent of the hover actions -->

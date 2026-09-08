@@ -43,6 +43,12 @@
         <input id="albumYear" v-model="albumYear" type="number" placeholder="Enter year (e.g., 2025)" min="1900" max="2100"
           class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
       </div>
+      <div class="mb-6">
+        <label class="flex items-center gap-2 text-gray-800">
+          <input id="albumPrivate" v-model="albumPrivate" type="checkbox" class="w-4 h-4" />
+          Private (hidden from anonymous visitors)
+        </label>
+      </div>
       <div class="flex justify-end gap-4 flex-wrap sm:flex-nowrap">
         <button @click="$emit('close')"
           class="bg-gray-100 text-gray-800 border border-gray-300 px-4 py-3 rounded-md text-sm transition hover:bg-gray-200 min-w-[80px]">
@@ -80,6 +86,7 @@ const albumName = ref('')
 const albumDescription = ref('')
 const albumMonth = ref('')
 const albumYear = ref('')
+const albumPrivate = ref(true)
 const albumNameInput = ref(null)
 
 // Methods
@@ -90,7 +97,8 @@ const handleCreate = () => {
     name: albumName.value.trim(),
     description: albumDescription.value.trim() || null,
     month: albumMonth.value || null,
-    year: albumYear.value || null
+    year: albumYear.value || null,
+    isPrivate: albumPrivate.value
   })
 }
 
@@ -99,6 +107,7 @@ const resetForm = () => {
   albumDescription.value = ''
   albumMonth.value = ''
   albumYear.value = ''
+  albumPrivate.value = true
 }
 
 // Focus input when dialog opens
