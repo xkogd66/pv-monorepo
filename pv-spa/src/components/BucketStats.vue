@@ -10,10 +10,22 @@
       <button class="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200" @click="fetchStats">Retry</button>
     </div>
 
-    <div v-else class="grid grid-cols-2 gap-3">
-      <div v-for="tile in tiles" :key="tile.label" class="px-4 py-3 rounded-lg bg-gray-50 border border-gray-100 text-center">
-        <div class="text-lg md:text-xl font-semibold text-gray-900 tabular-nums">{{ tile.value }}</div>
-        <div class="text-xs md:text-sm text-gray-500">{{ tile.label }}</div>
+    <div v-else class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div v-for="tile in tiles" :key="tile.label" class="px-4 py-3 rounded-lg bg-gray-50 border border-gray-100 text-center">
+          <div class="text-lg md:text-xl font-semibold text-gray-900 tabular-nums">{{ tile.value }}</div>
+          <div class="text-xs md:text-sm text-gray-500">{{ tile.label }}</div>
+        </div>
+      </div>
+
+      <div v-if="countryRows.length" class="px-1">
+        <div class="text-xs font-medium text-gray-500 mb-1.5">Photos by Country</div>
+        <div class="space-y-1 max-h-40 overflow-y-auto">
+          <div v-for="row in countryRows" :key="row.country" class="flex items-center justify-between text-sm text-gray-700">
+            <span class="truncate">{{ row.country }}</span>
+            <span class="font-semibold tabular-nums pl-2">{{ row.count.toLocaleString() }}</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -42,6 +54,13 @@ const tiles = computed(() => [
   { label: 'Total Albums', value: (stats.value.totalAlbums ?? 0).toLocaleString() },
   { label: 'Gallery Size', value: formatSize(stats.value.totalSize ?? 0) },
 ])
+
+const countryRows = computed(() => {
+  const counts = stats.value.photosByCountry || {}
+  return Object.entries(counts)
+    .map(([country, count]) => ({ country, count }))
+    .sort((a, b) => b.count - a.count)
+})
 
 async function fetchStats() {
   loading.value = true
