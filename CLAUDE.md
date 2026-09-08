@@ -14,7 +14,7 @@ Never run `kubectl` (or any other command that reads/touches the live K3s cluste
 
 ## Visual Verification
 
-Do not attempt to visually verify UI changes yourself (screenshots, headless browser driving, etc.). Make the code change, confirm it builds/typechecks, and then explicitly ask the user to check it in their own browser (dev server or real environment). Do not claim a UI change "looks correct" or "works" based on your own screenshot — you cannot see, and simulated verification is not a substitute for a human actually looking at it.
+Do not attempt to visually verify UI changes yourself (screenshots, headless browser driving, etc.), and do not run build or dev-server commands (`npm run build`, `npm run dev`, `vite build`, etc.) to self-verify either. Make the code change, then explicitly ask the user to build/run/check it themselves (dev server or real environment). Do not claim a UI change "looks correct" or "works" based on your own screenshot or build output — you cannot see, and simulated verification is not a substitute for a human actually checking it.
 
 ---
 
@@ -255,6 +255,18 @@ cluster.
 ## SPA Layout
 
 `App.vue` `<main>` uses `px-2 sm:px-4 py-4 sm:py-6` — minimal horizontal padding, no `max-w` constraint. Individual views that need centering (e.g. `Albums.vue`) apply their own `max-w-[1200px] mx-auto`. Do not add a global `max-w` back to `App.vue` — it causes excessive whitespace in the photo grid.
+
+## Landing Page (`Home.vue`)
+
+Shown only when the visitor is unauthenticated — `App.vue` routes to `home` on load/logout when `!isAuthenticated`, otherwise straight to `albums`.
+
+- Hero fetches `apiService.getAlbums()` on mount and uses each album's `coverThumbnailUrl` (already presigned server-side, no per-album `getAlbumContents` calls needed) as a background collage. Falls back silently to a plain gradient if the fetch fails or no albums have a cover yet — no error shown to the visitor.
+- The single CTA, **"Browse Galleries"**, emits `navigate('albums')`. This is not decorative — `GET /albums` and `GET /objects/:name` require no auth, and this button is the *only* path an anonymous visitor has into `Albums.vue`. Do not remove it (or the `@navigate="handleNavigation"` listener on `<Home>` in `App.vue`) without replacing it with another way to browse anonymously.
+- Login/Register are deliberately **not** on this page — they live only in `AppHeader.vue` (top nav / user menu), which already wires them to the same `handleLoginTrigger`/`handleRegisterTrigger` in `App.vue`. Keep auth entry points low-key here; this was a deliberate call, not an oversight.
+
+## Statistics (`AppHeader.vue`)
+
+Gallery statistics (`BucketStats.vue`) live in the top nav, not on the landing page. Gated on `isAuthenticated` (any logged-in user, not just admins) — a "Statistics" button in the desktop nav toggles a popover anchored to it (same pattern as the health-status dot), and the mobile menu gets an inline expand/collapse toggle instead (popovers don't work well on mobile). `BucketStats.vue` is self-contained and fetches its own data — no props needed beyond the existing `noBorder` styling flag.
 
 ## Photo Grid (`PhotoGrid.vue`)
 

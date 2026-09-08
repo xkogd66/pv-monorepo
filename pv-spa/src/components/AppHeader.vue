@@ -56,6 +56,16 @@ const mobileSearchQuery = ref("");ible on md and below) -->
           Albums
         </button>
         <button
+          v-if="isAuthenticated"
+          class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
+          @click="showMobileStats = !showMobileStats"
+        >
+          {{ showMobileStats ? 'Hide Statistics' : 'Statistics' }}
+        </button>
+        <div v-if="showMobileStats" class="px-2 border-b border-gray-200">
+          <BucketStats noBorder />
+        </div>
+        <button
           v-if="isAdmin"
           class="w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
           @click="
@@ -162,6 +172,21 @@ const mobileSearchQuery = ref("");ible on md and below) -->
       >
         <i class="fas fa-layer-group mr-2"></i> Albums
       </button>
+      <div v-if="isAuthenticated" class="relative" ref="statsBtnRef">
+        <button
+          class="text-sm px-4 py-2 border-b-2 transition-all text-gray-600 border-transparent hover:text-blue-500 hover:bg-blue-50"
+          @click.stop="toggleStatsPopover"
+        >
+          <i class="fas fa-chart-bar mr-2"></i> Statistics
+        </button>
+        <div
+          v-if="showStatsPopover"
+          class="absolute top-full left-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
+          @click.stop
+        >
+          <BucketStats noBorder />
+        </div>
+      </div>
       <button
         v-if="isAdmin"
         class="text-sm px-4 py-2 border-b-2 transition-all"
@@ -312,6 +337,7 @@ const mobileSearchQuery = ref("");ible on md and below) -->
 import { ref, computed, onMounted, onUnmounted, watchEffect } from "vue";
 import apiService from "../services/api.js";
 import PasswordChange from "./PasswordChange.vue";
+import BucketStats from "./BucketStats.vue";
 
 const props = defineProps({
   currentView: String,
@@ -326,6 +352,9 @@ const healthLevel = ref("checking");
 const healthServices = ref({});
 const showHealthPopover = ref(false);
 const healthDotRef = ref(null);
+const showStatsPopover = ref(false);
+const showMobileStats = ref(false);
+const statsBtnRef = ref(null);
 const showUserDropdown = ref(false);
 const showPasswordDialog = ref(false);
 const userMenuRef = ref(null);
@@ -366,6 +395,9 @@ const serviceList = computed(() => {
 
 const toggleHealthPopover = () => {
   showHealthPopover.value = !showHealthPopover.value;
+};
+const toggleStatsPopover = () => {
+  showStatsPopover.value = !showStatsPopover.value;
 };
 
 const healthTooltip = computed(() => {
@@ -461,6 +493,9 @@ const handleClickOutside = (e) => {
   }
   if (healthDotRef.value && !healthDotRef.value.contains(e.target)) {
     showHealthPopover.value = false;
+  }
+  if (statsBtnRef.value && !statsBtnRef.value.contains(e.target)) {
+    showStatsPopover.value = false;
   }
   
   // Close mobile menu if clicking outside
