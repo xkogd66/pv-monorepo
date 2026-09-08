@@ -1,47 +1,90 @@
 <template>
-  <div class="p-8 max-w-6xl mx-auto sm:p-4 xs:p-3">
-    <div class="text-center py-16 border-b border-gray-300 mb-12 sm:py-10 sm:mb-8 xs:py-8 xs:mb-6">
-      <h1 class="text-5xl font-bold text-gray-800 mb-4 bg-gradient-to-br from-blue-500 to-blue-700 bg-clip-text text-transparent sm:text-4xl xs:text-3xl">
-        EKSKOG GALLERY
-      </h1>
-      <p class="text-xl text-gray-600 mb-8 max-w-2xl mx-auto leading-relaxed px-4 sm:text-lg sm:px-4 xs:text-base">
-        Minimalist photo gallery and storage management
-      </p>
+  <section
+    class="relative overflow-hidden rounded-b-2xl min-h-[65vh] flex items-center justify-center text-center -mx-2 sm:-mx-4 -mt-4 sm:-mt-6"
+  >
+    <div
+      v-if="heroThumbs.length"
+      class="absolute inset-0 grid grid-cols-4 sm:grid-cols-6 gap-1"
+    >
+      <img
+        v-for="(src, i) in heroThumbs"
+        :key="i"
+        :src="src"
+        alt=""
+        loading="lazy"
+        class="w-full h-full object-cover"
+      />
     </div>
 
-    <div class="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-8 mt-8 sm:grid-cols-1 sm:gap-6 xs:gap-4 xs:mt-6">
-      <div class="bg-white border border-gray-300 rounded-xl p-8 text-center transition-all duration-200 cursor-pointer hover:border-blue-500 hover:shadow-[0_4px_16px_rgba(33,150,243,0.1)] hover:-translate-y-0.5 sm:p-6 xs:p-5" @click="$emit('navigate', 'albums')">
-        <div class="text-5xl mb-4 text-red-500 sm:text-4xl xs:text-4xl">
-          <i class="fas fa-layer-group"></i>
-        </div>
-        <h3 class="text-xl font-semibold text-gray-800 mb-4 sm:text-lg xs:text-lg">Organize Albums</h3>
-        <p class="text-gray-600 leading-relaxed sm:text-sm xs:text-sm">
-          Create and manage albums to organize your photos efficiently.
-        </p>
-      </div>
-      <div class="bg-white border border-gray-300 rounded-xl p-8 text-center transition-all duration-200 sm:p-6 xs:p-5">
-        <div class="text-5xl mb-4 text-blue-500 sm:text-4xl xs:text-4xl">
-          <i class="fas fa-chart-bar"></i>
-        </div>
-        <h3 class="text-xl font-semibold text-gray-800 mb-4 sm:text-lg xs:text-lg">Gallery Statistics</h3>
-        <p class="text-gray-600 leading-relaxed sm:text-sm xs:text-sm">
-          See file counts, sizes, and type breakdowns.
-        </p>
-        <button class="btn-primary mt-4" @click="showStats = !showStats">
-          {{ showStats ? 'Hide Statistics' : 'Show Statistics' }}
+    <div
+      class="absolute inset-0"
+      :class="
+        heroThumbs.length
+          ? 'bg-gradient-to-b from-black/50 via-black/60 to-gray-50'
+          : 'bg-gradient-to-b from-blue-900/20 to-gray-50'
+      "
+    ></div>
+
+    <div class="relative z-10 px-4 py-24">
+      <h1
+        class="text-5xl sm:text-6xl font-bold mb-4"
+        :class="
+          heroThumbs.length
+            ? 'text-white'
+            : 'bg-gradient-to-br from-blue-500 to-blue-700 bg-clip-text text-transparent'
+        "
+      >
+        EKSKOG GALLERY
+      </h1>
+      <p
+        class="text-lg sm:text-xl mb-8 max-w-xl mx-auto"
+        :class="heroThumbs.length ? 'text-gray-100' : 'text-gray-600'"
+      >
+        Your photos, organized and always within reach.
+      </p>
+      <div class="flex gap-4 justify-center flex-wrap">
+        <button
+          class="px-6 py-3 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md transition"
+          @click="$emit('login')"
+        >
+          Log In
         </button>
-        <div v-if="showStats" class="mt-6 text-left">
-          <BucketStats noBorder />
-        </div>
+        <button
+          class="px-6 py-3 rounded-md bg-white/90 hover:bg-white text-gray-800 font-semibold shadow-md transition"
+          @click="$emit('register')"
+        >
+          Create Account
+        </button>
       </div>
     </div>
-  </div>
+  </section>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import BucketStats from './BucketStats.vue'
-// Emits
-defineEmits(['navigate'])
-const showStats = ref(false)
+import { ref, onMounted } from 'vue'
+import apiService from '../services/api.js'
+
+defineEmits(['login', 'register'])
+
+const heroThumbs = ref([])
+
+// ponytail: stops at the first album that has thumbnails; if the gallery
+// grows a lot of empty albums this becomes a slow scan — swap for a
+// dedicated "sample photos" endpoint if that happens.
+onMounted(async () => {
+  try {
+    const { albums = [] } = await apiService.getAlbums()
+    for (const album of albums) {
+      const res = await apiService.getAlbumContents(album.name)
+      const objects = res?.album?.objects || res?.objects || []
+      const thumbs = objects.map((o) => o.thumbnailUrl).filter(Boolean)
+      if (thumbs.length) {
+        heroThumbs.value = thumbs.slice(0, 12)
+        break
+      }
+    }
+  } catch {
+    // silent fallback to the gradient-only hero
+  }
+})
 </script>
