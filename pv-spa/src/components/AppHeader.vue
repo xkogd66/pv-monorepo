@@ -62,7 +62,7 @@ const mobileSearchQuery = ref("");ible on md and below) -->
         >
           {{ showMobileStats ? 'Hide Statistics' : 'Statistics' }}
         </button>
-        <div v-if="showMobileStats" class="px-2 border-b border-gray-200">
+        <div v-if="showMobileStats" class="px-2 border-b border-gray-200 max-h-[50vh] overflow-y-auto">
           <BucketStats noBorder />
         </div>
         <button
@@ -181,7 +181,7 @@ const mobileSearchQuery = ref("");ible on md and below) -->
         </button>
         <div
           v-if="showStatsPopover"
-          class="absolute top-full left-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
+          class="absolute top-full left-0 mt-2 w-80 max-h-[70vh] overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-50"
           @click.stop
         >
           <BucketStats noBorder />
