@@ -5,7 +5,7 @@
       <h1
         class="text-3xl font-bold text-gray-900 dark:text-white flex items-center justify-center gap-3"
       >
-        <i class="fas fa-cog text-blue-500"></i> Settings
+        <i class="fas fa-cog text-emerald-500"></i> Settings
       </h1>
       <p class="text-gray-600 dark:text-gray-400 text-sm mt-2">
         Configure your PhotoVault application settings
@@ -37,9 +37,9 @@
             <div
               @click="toggleDropdown"
               :class="[
-                'w-full px-3 py-2 pr-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out cursor-pointer',
+                'w-full px-3 py-2 pr-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition duration-150 ease-in-out cursor-pointer',
                 isLoadingUsers ? 'opacity-50 cursor-not-allowed' : '',
-                isOpen ? 'ring-2 ring-blue-500 border-blue-500' : '',
+                isOpen ? 'ring-2 ring-emerald-500 border-emerald-500' : '',
               ]"
               tabindex="0"
               @keydown.enter="toggleDropdown"
@@ -102,14 +102,14 @@
             v-model="newPassword"
             type="password"
             placeholder="Enter new password"
-            class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
         </div>
 
         <!-- Reset Button -->
         <button
           @click="resetUserPassword"
-          class="inline-flex items-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-60"
+          class="inline-flex items-center gap-2 px-5 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition disabled:opacity-60"
           :disabled="!selectedUserId || !newPassword || isResettingPassword"
         >
           <i class="fas fa-key" v-if="!isResettingPassword"></i>
@@ -155,7 +155,7 @@
       <div class="px-8 py-6 bg-gray-50 dark:bg-gray-800 flex flex-wrap gap-4">
         <button
           @click="saveSettings"
-          class="inline-flex items-center gap-2 px-5 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-60"
+          class="inline-flex items-center gap-2 px-5 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition disabled:opacity-60"
           :disabled="isSaving || !hasChanges"
         >
           <i class="fas fa-save" v-if="!isSaving"></i>
@@ -174,7 +174,7 @@
 
         <button
           @click="reloadApplication"
-          class="inline-flex items-center gap-2 px-5 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition"
+          class="inline-flex items-center gap-2 px-5 py-3 bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-600 transition"
           v-if="requiresReload"
         >
           <i class="fas fa-refresh"></i>

@@ -6,14 +6,14 @@
         <h1 class="text-3xl font-semibold text-gray-800">User Management</h1>
         <p class="text-sm text-gray-500 mt-1">Manage system users and permissions</p>
       </div>
-      <button class="bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm px-4 py-2 rounded-md flex items-center gap-2" @click="showCreateDialog = true">
+      <button class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm px-4 py-2 rounded-md flex items-center gap-2" @click="showCreateDialog = true">
         <i class="fas fa-user-plus"></i> Add New User
       </button>
     </div>
 
     <!-- Loading -->
     <div v-if="loading" class="text-center py-12">
-      <div class="w-10 h-10 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+      <div class="w-10 h-10 border-4 border-gray-200 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4"></div>
       <p class="text-gray-600">Loading users...</p>
     </div>
 
@@ -39,7 +39,7 @@
           <tbody>
             <tr v-for="user in users" :key="user.id" class="hover:bg-indigo-50">
               <td class="px-6 py-4 flex items-center gap-4">
-                <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-lg">
+                <div class="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-lg">
                   <i class="fas fa-user"></i>
                 </div>
                 <div>
@@ -58,7 +58,7 @@
               <td class="px-6 py-4 text-sm text-gray-600">{{ formatDate(user.lastLogin) }}</td>
               <td class="px-6 py-4">
                 <div class="flex gap-2">
-                  <button class="border border-gray-300 text-blue-600 hover:bg-blue-50 rounded-md w-8 h-8 flex items-center justify-center" @click="editUser(user)" title="Edit User">
+                  <button class="border border-gray-300 text-emerald-600 hover:bg-emerald-50 rounded-md w-8 h-8 flex items-center justify-center" @click="editUser(user)" title="Edit User">
                     <i class="fas fa-edit"></i>
                   </button>
                   <button class="border border-gray-300 text-orange-500 hover:bg-orange-50 rounded-md w-8 h-8 flex items-center justify-center" @click="changePassword(user)" title="Change Password">
@@ -79,7 +79,7 @@
         <div class="text-5xl text-gray-300 mb-4"><i class="fas fa-users"></i></div>
         <h3 class="text-xl font-semibold text-gray-800 mb-2">No Users Found</h3>
         <p class="text-gray-500 mb-6">Start by adding your first user to the system.</p>
-        <button class="bg-blue-500 hover:bg-blue-600 text-white font-semibold text-sm px-4 py-2 rounded-md" @click="showCreateDialog = true">
+        <button class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm px-4 py-2 rounded-md" @click="showCreateDialog = true">
           Add User
         </button>
       </div>
@@ -93,23 +93,23 @@
         <form @submit.prevent="saveUser" class="space-y-4">
           <div>
             <label for="name" class="block text-sm font-medium text-gray-700">Full Name</label>
-            <input id="name" v-model="formData.name" type="text" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input id="name" v-model="formData.name" type="text" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div>
             <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
-            <input id="username" v-model="formData.username" type="text" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input id="username" v-model="formData.username" type="text" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div>
             <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
-            <input id="email" v-model="formData.email" type="email" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input id="email" v-model="formData.email" type="email" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div v-if="!isEditing">
             <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
-            <input id="password" v-model="formData.password" type="password" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <input id="password" v-model="formData.password" type="password" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           </div>
           <div>
             <label for="role" class="block text-sm font-medium text-gray-700">Role</label>
-            <select id="role" v-model="formData.role" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <select id="role" v-model="formData.role" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500">
               <option value="user">User</option>
               <option value="admin">Admin</option>
             </select>
@@ -117,7 +117,7 @@
         </form>
         <div class="flex justify-end gap-3 mt-6">
           <button class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md" @click="closeCreateDialog">Cancel</button>
-          <button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md font-semibold" :disabled="!isFormValid || saving" @click="saveUser">
+          <button class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-md font-semibold" :disabled="!isFormValid || saving" @click="saveUser">
             {{ saving ? 'Saving...' : (isEditing ? 'Update User' : 'Create User') }}
           </button>
         </div>

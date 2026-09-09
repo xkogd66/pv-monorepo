@@ -27,7 +27,7 @@
           v-if="canRename"
           @click.stop="$emit('rename', album)"
           title="Edit Album"
-          class="w-7 h-7 bg-white/95 backdrop-blur-sm text-gray-700 rounded-full shadow-sm hover:bg-blue-500 hover:text-white transition-all flex items-center justify-center"
+          class="w-7 h-7 bg-white/95 backdrop-blur-sm text-gray-700 rounded-full shadow-sm hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center"
         >
           <i class="fas fa-edit text-xs"></i>
         </button>

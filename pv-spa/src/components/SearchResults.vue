@@ -11,7 +11,7 @@
       </div>
 
       <div v-if="loading" class="text-center py-8">
-        <div class="w-8 h-8 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+        <div class="w-8 h-8 border-4 border-gray-200 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4"></div>
         <p class="text-gray-600">Searching...</p>
       </div>
 
@@ -37,7 +37,7 @@
           v-for="album in matchingAlbums"
           :key="album.name"
           @click="selectAlbum(album)"
-          class="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
+          class="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition-colors"
         >
           <div class="flex items-center justify-between">
             <div>

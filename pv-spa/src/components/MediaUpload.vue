@@ -4,13 +4,13 @@
     @click="closeUploadDialog">
     <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-xl max-h-[90vh] overflow-y-auto" @click.stop>
       <h3 class="text-lg font-semibold mb-6 flex items-center gap-2">
-        <i class="fas fa-cloud-upload-alt text-blue-500"></i> Upload Media
+        <i class="fas fa-cloud-upload-alt text-emerald-500"></i> Upload Media
       </h3>
 
       <!-- Upload Type Selector -->
       <div class="flex gap-2 mb-3">
         <button
-          class="flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-gray-200 rounded-lg text-gray-600 text-sm font-medium hover:border-blue-500 hover:text-blue-500 transition"
+          class="flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-gray-200 rounded-lg text-gray-600 text-sm font-medium hover:border-emerald-500 hover:text-emerald-500 transition"
           @click="triggerUpload('bulk-photos')">
           <i class="fas fa-layer-group text-base"></i> Photos
           <i class="fas fa-circle-info text-xs text-emerald-600"
@@ -22,7 +22,7 @@
           -->
         </button>
         <button
-          class="flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-gray-200 rounded-lg text-gray-600 text-sm font-medium hover:border-blue-500 hover:text-blue-500 transition"
+          class="flex-1 flex items-center justify-center gap-2 px-4 py-3 border-2 border-gray-200 rounded-lg text-gray-600 text-sm font-medium hover:border-emerald-500 hover:text-emerald-500 transition"
           @click="triggerUpload('videos')">
           <i class="fas fa-video text-base"></i> Videos
         </button>
@@ -68,7 +68,7 @@
       <!-- Upload Progress -->
       <div v-if="uploading" class="mb-6">
         <div class="w-full h-2 bg-gray-200 rounded overflow-hidden mb-2">
-          <div class="h-full bg-blue-500 transition-all duration-300" :style="{ width: `${uploadProgress}%` }"></div>
+          <div class="h-full bg-emerald-500 transition-all duration-300" :style="{ width: `${uploadProgress}%` }"></div>
         </div>
         <p class="text-center text-sm text-gray-600">{{ uploadStatus }}</p>
       </div>
@@ -80,7 +80,7 @@
           {{ uploadProgress === 100 && !uploading ? 'Done' : 'Cancel' }}
         </button>
         <button v-if="uploadProgress < 100"
-          class="bg-blue-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-600 transition disabled:bg-blue-300 disabled:cursor-not-allowed"
+          class="bg-emerald-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-emerald-600 transition disabled:bg-emerald-300 disabled:cursor-not-allowed"
           @click="uploadFiles" :disabled="selectedFiles.length === 0 || uploading">
           {{ uploading ? 'Uploading...' : `Upload ${selectedFiles.length} ${uploadType === 'videos' ? 'Video' :
             'Photo'}${selectedFiles.length !== 1 ? 's' : ''}` }}
@@ -100,7 +100,7 @@
         Your files have been uploaded. The album will refresh automatically when processing is complete.
       </p>
       <div class="flex justify-end">
-        <button class="bg-blue-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-600 transition"
+        <button class="bg-emerald-500 text-white px-4 py-2 rounded text-sm font-medium hover:bg-emerald-600 transition"
           @click="confirmUploadComplete">
           OK
         </button>

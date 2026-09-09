@@ -53,7 +53,7 @@
       <button 
         @click="loadMore"
         :disabled="isLoading"
-        class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2"
+        class="px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-emerald-400 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2"
       >
         <span v-if="!isLoading">Load More Videos</span>
         <span v-else class="flex items-center gap-2">

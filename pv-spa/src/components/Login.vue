@@ -5,7 +5,7 @@
       <!-- Header -->
       <div class="text-center mb-8">
         <div
-          class="w-20 h-20 mx-auto mb-6 flex items-center justify-center text-white text-3xl rounded-full bg-gradient-to-br from-blue-500 to-blue-700">
+          class="w-20 h-20 mx-auto mb-6 flex items-center justify-center text-white text-3xl rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700">
           <i class="fas fa-camera"></i>
         </div>
         <h1 class="text-2xl font-bold text-gray-800 mb-2">HBVU PHOTOS</h1>
@@ -18,20 +18,20 @@
           <label for="username" class="block mb-2 font-semibold text-gray-800 text-sm">Username</label>
           <input id="username" ref="usernameInput" v-model="username" type="text" placeholder="Enter your username"
             required :disabled="loading" autocomplete="username"
-            class="px-4 py-3 border-2 border-gray-200 rounded-lg text-base transition focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-gray-100 disabled:opacity-70"
+            class="px-4 py-3 border-2 border-gray-200 rounded-lg text-base transition focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 disabled:bg-gray-100 disabled:opacity-70"
             style="width: 300px;" />
         </div>
         <div>
           <label for="password" class="block mb-2 font-semibold text-gray-800 text-sm">Password</label>
           <input id="password" v-model="password" type="password" placeholder="Enter your password" required
             :disabled="loading" autocomplete="current-password"
-            class="px-4 py-3 border-2 border-gray-200 rounded-lg text-base transition focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-gray-100 disabled:opacity-70"
+            class="px-4 py-3 border-2 border-gray-200 rounded-lg text-base transition focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 disabled:bg-gray-100 disabled:opacity-70"
             style="width: 300px;" />
         </div>
         <!-- Turnstile Widget -->
         <div style="width: 300px;">
           <label class="block mb-2 font-semibold text-gray-800 text-sm">Security Verification</label>
-          <div class="min-h-[65px] px-4 py-3 rounded-lg bg-white flex items-center justify-center transition focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-100"
+          <div class="min-h-[65px] px-4 py-3 rounded-lg bg-white flex items-center justify-center transition focus-within:border-emerald-500 focus-within:ring-4 focus-within:ring-emerald-100"
                style="border: none;">
             <div ref="turnstileRef"></div>
           </div>
@@ -41,7 +41,7 @@
           {{ turnstileError }}
         </div>
         <button type="submit" :disabled="loading || !isFormValid || !turnstileToken"
-          class="flex items-center justify-center gap-2 px-4 py-3 text-white font-semibold text-base rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 transition hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed min-h-[50px]"
+          class="flex items-center justify-center gap-2 px-4 py-3 text-white font-semibold text-base rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-700 transition hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed min-h-[50px]"
           style="width: 300px;">
           <i v-if="loading" class="fas fa-spinner fa-spin"></i>
           <span>{{ loading ? 'Signing in...' : 'Sign In' }}</span>

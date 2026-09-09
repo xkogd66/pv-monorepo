@@ -18,11 +18,11 @@
             type="text"
             :value="shareUrl"
             readonly
-            class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
           <button
             @click="copyToClipboard"
-            class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-sm"
+            class="px-4 py-2 bg-emerald-500 text-white rounded-md hover:bg-emerald-600 transition-colors text-sm"
           >
             {{ copied ? 'Copied!' : 'Copy' }}
           </button>

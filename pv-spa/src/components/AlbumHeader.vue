@@ -33,7 +33,7 @@
           <i class="fas fa-share-alt text-sm"></i>
         </button>
         <button v-if="canUploadPhotos" @click="$emit('upload')"
-          class="h-9 w-9 flex items-center justify-center rounded-md bg-blue-500 hover:bg-blue-600 text-white transition"
+          class="h-9 w-9 flex items-center justify-center rounded-md bg-emerald-500 hover:bg-emerald-600 text-white transition"
           title="Upload">
           <i class="fas fa-plus text-sm"></i>
         </button>

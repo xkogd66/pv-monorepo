@@ -36,7 +36,7 @@ const mobileSearchQuery = ref("");ible on md and below) -->
               v-model="mobileSearchQuery"
               type="text"
               placeholder="Search albums..."
-              class="w-full px-3 py-2 pl-8 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              class="w-full px-3 py-2 pl-8 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               @keyup.enter="performMobileSearch"
             />
             <i class="fas fa-search absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs"></i>
@@ -143,7 +143,7 @@ const mobileSearchQuery = ref("");ible on md and below) -->
         class="hidden md:block text-xl text-gray-800 cursor-pointer"
         @click="$emit('navigate', 'home')"
       >
-        <i class="fas fa-camera text-2xl text-blue-500 hover:text-blue-700"></i>
+        <i class="fas fa-camera text-2xl text-emerald-500 hover:text-emerald-700"></i>
       </div>
     </div>
 
@@ -155,7 +155,7 @@ const mobileSearchQuery = ref("");ible on md and below) -->
           v-model="searchQuery"
           type="text"
           placeholder="Search albums..."
-          class="w-64 px-4 py-2 pl-10 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          class="w-64 px-4 py-2 pl-10 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
           @keyup.enter="performSearch"
         />
         <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
@@ -165,8 +165,8 @@ const mobileSearchQuery = ref("");ible on md and below) -->
         class="text-sm px-4 py-2 border-b-2 transition-all"
         :class="
           currentView === 'albums'
-            ? 'text-blue-600 bg-blue-50 border-blue-600 font-semibold'
-            : 'text-gray-600 border-transparent hover:text-blue-500 hover:bg-blue-50'
+            ? 'text-emerald-600 bg-emerald-50 border-emerald-600 font-semibold'
+            : 'text-gray-600 border-transparent hover:text-emerald-500 hover:bg-emerald-50'
         "
         @click="$emit('navigate', 'albums')"
       >
@@ -174,7 +174,7 @@ const mobileSearchQuery = ref("");ible on md and below) -->
       </button>
       <div v-if="isAuthenticated" class="relative" ref="statsBtnRef">
         <button
-          class="text-sm px-4 py-2 border-b-2 transition-all text-gray-600 border-transparent hover:text-blue-500 hover:bg-blue-50"
+          class="text-sm px-4 py-2 border-b-2 transition-all text-gray-600 border-transparent hover:text-emerald-500 hover:bg-emerald-50"
           @click.stop="toggleStatsPopover"
         >
           <i class="fas fa-chart-bar mr-2"></i> Statistics
@@ -192,8 +192,8 @@ const mobileSearchQuery = ref("");ible on md and below) -->
         class="text-sm px-4 py-2 border-b-2 transition-all"
         :class="
           currentView === 'user-management'
-            ? 'text-blue-600 bg-blue-50 border-blue-600 font-semibold'
-            : 'text-gray-600 border-transparent hover:text-blue-500 hover:bg-blue-50'
+            ? 'text-emerald-600 bg-emerald-50 border-emerald-600 font-semibold'
+            : 'text-gray-600 border-transparent hover:text-emerald-500 hover:bg-emerald-50'
         "
         @click="$emit('navigate', 'user-management')"
       >
@@ -204,8 +204,8 @@ const mobileSearchQuery = ref("");ible on md and below) -->
         class="text-sm px-4 py-2 border-b-2 transition-all"
         :class="
           currentView === 'bulk-jobs'
-            ? 'text-blue-600 bg-blue-50 border-blue-600 font-semibold'
-            : 'text-gray-600 border-transparent hover:text-blue-500 hover:bg-blue-50'
+            ? 'text-emerald-600 bg-emerald-50 border-emerald-600 font-semibold'
+            : 'text-gray-600 border-transparent hover:text-emerald-500 hover:bg-emerald-50'
         "
         @click="$emit('navigate', 'bulk-jobs')"
       >
@@ -216,8 +216,8 @@ const mobileSearchQuery = ref("");ible on md and below) -->
         class="text-sm px-4 py-2 border-b-2 transition-all"
         :class="
           currentView === 'settings'
-            ? 'text-blue-600 bg-blue-50 border-blue-600 font-semibold'
-            : 'text-gray-600 border-transparent hover:text-blue-500 hover:bg-blue-50'
+            ? 'text-emerald-600 bg-emerald-50 border-emerald-600 font-semibold'
+            : 'text-gray-600 border-transparent hover:text-emerald-500 hover:bg-emerald-50'
         "
         @click="$emit('navigate', 'settings')"
       >
@@ -268,7 +268,7 @@ const mobileSearchQuery = ref("");ible on md and below) -->
         ref="userMenuRef"
       >
         <div
-          class="w-8 h-8 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-lg"
+          class="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-lg"
         >
           <i class="fas fa-user-circle"></i>
         </div>

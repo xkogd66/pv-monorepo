@@ -21,7 +21,7 @@
       :class="
         heroThumbs.length
           ? 'bg-gradient-to-b from-black/50 via-black/60 to-gray-50'
-          : 'bg-gradient-to-b from-blue-900/20 to-gray-50'
+          : 'bg-gradient-to-b from-emerald-900/20 to-gray-50'
       "
     ></div>
 
@@ -31,7 +31,7 @@
         :class="
           heroThumbs.length
             ? 'text-white'
-            : 'bg-gradient-to-br from-blue-500 to-blue-700 bg-clip-text text-transparent'
+            : 'bg-gradient-to-br from-emerald-500 to-emerald-700 bg-clip-text text-transparent'
         "
       >
         EKSKOG GALLERY
@@ -43,7 +43,7 @@
         Your photos, organized and always within reach.
       </p>
       <button
-        class="px-6 py-3 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md transition"
+        class="px-6 py-3 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-md transition"
         @click="$emit('navigate', 'albums')"
       >
         Browse Galleries

@@ -25,7 +25,7 @@
         <!-- Info Banner -->
         <div
           v-if="isOwnPassword"
-          class="bg-blue-100 border border-blue-300 text-blue-800 p-4 rounded-lg mb-6 flex items-center gap-2 text-sm"
+          class="bg-emerald-100 border border-emerald-300 text-emerald-800 p-4 rounded-lg mb-6 flex items-center gap-2 text-sm"
         >
           <i class="fas fa-info-circle"></i>
           You are changing your own password. You will need to log in again after changing it.
@@ -51,7 +51,7 @@
                 placeholder="Enter your current password"
                 required
                 :disabled="loading"
-                class="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-gray-100"
+                class="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 disabled:bg-gray-100"
               />
               <button
                 type="button"
@@ -75,7 +75,7 @@
                 required
                 minlength="6"
                 :disabled="loading"
-                class="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-gray-100"
+                class="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 disabled:bg-gray-100"
               />
               <button
                 type="button"
@@ -110,7 +110,7 @@
                 placeholder="Confirm new password"
                 required
                 :disabled="loading"
-                class="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-gray-100"
+                class="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg text-base focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 disabled:bg-gray-100"
               />
               <button
                 type="button"
@@ -157,7 +157,7 @@
             </button>
             <button
               type="submit"
-              class="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-500 border border-blue-500 text-white hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              class="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-500 border border-emerald-500 text-white hover:bg-emerald-600 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               :disabled="!canSubmit || loading"
             >
               <i v-if="loading" class="fas fa-spinner fa-spin"></i>

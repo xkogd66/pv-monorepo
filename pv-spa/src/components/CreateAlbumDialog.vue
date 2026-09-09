@@ -7,7 +7,7 @@
         <label for="albumName" class="block mb-2 font-medium text-gray-800">Album Name:</label>
         <input id="albumName" v-model="albumName" type="text" placeholder="Enter album name..."
           @keyup.enter="handleCreate" ref="albumNameInput"
-          class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
+          class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200" />
       </div>
       <div class="mb-6">
         <label for="albumDescription" class="block mb-2 font-medium text-gray-800">Description (optional):</label>
@@ -16,13 +16,13 @@
           v-model="albumDescription" 
           placeholder="Enter album description..."
           rows="3"
-          class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 resize-none"
+          class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 resize-none"
         ></textarea>
       </div>
       <div class="mb-6">
         <label for="albumMonth" class="block mb-2 font-medium text-gray-800">Month:</label>
         <select id="albumMonth" v-model="albumMonth"
-          class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
+          class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200">
           <option value="">Select month...</option>
           <option value="01">January</option>
           <option value="02">February</option>
@@ -41,7 +41,7 @@
       <div class="mb-6">
         <label for="albumYear" class="block mb-2 font-medium text-gray-800">Year:</label>
         <input id="albumYear" v-model="albumYear" type="number" placeholder="Enter year (e.g., 2025)" min="1900" max="2100"
-          class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
+          class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200" />
       </div>
       <div class="mb-6">
         <label class="flex items-center gap-2 text-gray-800">
@@ -55,7 +55,7 @@
           Cancel
         </button>
         <button @click="handleCreate" :disabled="!albumName.trim() || creating"
-          class="bg-blue-500 text-white px-4 py-3 rounded-md text-sm font-semibold shadow-md transition hover:bg-blue-600 disabled:opacity-60 disabled:cursor-not-allowed min-w-[120px]">
+          class="bg-emerald-500 text-white px-4 py-3 rounded-md text-sm font-semibold shadow-md transition hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed min-w-[120px]">
           {{ creating ? 'Creating...' : 'Create Album' }}
         </button>
       </div>

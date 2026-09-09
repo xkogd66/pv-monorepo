@@ -1,7 +1,7 @@
 <template>
   <div :class="noBorder ? 'px-2 py-3' : 'max-w-md mx-auto px-4 py-4'">
     <div v-if="loading" class="text-center py-3">
-      <div class="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent mx-auto mb-2"></div>
+      <div class="animate-spin rounded-full h-5 w-5 border-2 border-emerald-500 border-t-transparent mx-auto mb-2"></div>
       <p class="text-gray-500 text-sm md:text-lg">Loading...</p>
     </div>
 

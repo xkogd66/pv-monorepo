@@ -20,7 +20,7 @@
     <!-- Loading State -->
     <div v-if="loading" class="text-center py-12">
       <div
-        class="w-10 h-10 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"
+        class="w-10 h-10 border-4 border-gray-200 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4"
       ></div>
       <p class="text-gray-600">Loading album photos...</p>
     </div>

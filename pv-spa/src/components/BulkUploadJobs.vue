@@ -1,7 +1,7 @@
 <template>
   <div class="max-w-6xl mx-auto p-4 md:p-8">
     
-    <div class="mb-6 rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-blue-50/40 p-5 md:p-6">
+    <div class="mb-6 rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-emerald-50/40 p-5 md:p-6">
       <h2 class="text-2xl font-semibold text-slate-900">Monitor Media Uploads</h2>
       <p class="mt-1 text-sm text-slate-600">
         
@@ -28,7 +28,7 @@
           </div>
 
           <div class="flex items-center gap-2">
-            <span class="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+            <span class="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
               Running: {{ temporalRunningCount }}
             </span>
             <span class="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
@@ -190,7 +190,7 @@ const statusClass = (status) => {
     case 'COMPLETED':
       return 'bg-green-100 text-green-800';
     case 'RUNNING':
-      return 'bg-blue-100 text-blue-800';
+      return 'bg-emerald-100 text-emerald-800';
     case 'FAILED':
     case 'TIMED_OUT':
     case 'TERMINATED':

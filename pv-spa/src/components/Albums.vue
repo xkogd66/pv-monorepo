@@ -8,7 +8,7 @@
         </div>
         <!-- Create: icon-only on phone, labelled from sm up -->
         <button v-if="canCreateAlbum" @click="showCreateDialog = true" title="New album"
-          class="sm:hidden flex-none w-11 h-11 flex items-center justify-center bg-blue-600 text-white rounded-lg transition hover:bg-blue-700">
+          class="sm:hidden flex-none w-11 h-11 flex items-center justify-center bg-emerald-600 text-white rounded-lg transition hover:bg-emerald-700">
           <i class="fas fa-plus"></i>
         </button>
       </div>
@@ -18,7 +18,7 @@
           v-if="!loading && !error && availableYears.length > 0"
           v-model="selectedYear"
           title="Filter albums by year"
-          class="flex-1 sm:flex-none min-w-0 h-11 sm:h-[34px] px-2.5 text-sm sm:text-[13px] border border-gray-200 rounded-lg sm:rounded-md bg-white text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+          class="flex-1 sm:flex-none min-w-0 h-11 sm:h-[34px] px-2.5 text-sm sm:text-[13px] border border-gray-200 rounded-lg sm:rounded-md bg-white text-gray-700 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
         >
           <option :value="null">All years</option>
           <option v-for="y in availableYears" :key="y" :value="y">{{ y }}</option>
@@ -28,7 +28,7 @@
           v-if="!loading && !error && albums.length > 0"
           v-model="sortOrder"
           title="Sort albums"
-          class="flex-1 sm:flex-none min-w-0 h-11 sm:h-[34px] px-2.5 text-sm sm:text-[13px] border border-gray-200 rounded-lg sm:rounded-md bg-white text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+          class="flex-1 sm:flex-none min-w-0 h-11 sm:h-[34px] px-2.5 text-sm sm:text-[13px] border border-gray-200 rounded-lg sm:rounded-md bg-white text-gray-700 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
         >
           <option value="date-desc">Newest first</option>
           <option value="date-asc">Oldest first</option>
@@ -42,7 +42,7 @@
         </button>
 
         <button v-if="canCreateAlbum" @click="showCreateDialog = true"
-          class="hidden sm:flex items-center h-[34px] px-3.5 bg-blue-600 text-white rounded-md text-[13px] font-semibold transition hover:bg-blue-700 whitespace-nowrap">
+          class="hidden sm:flex items-center h-[34px] px-3.5 bg-emerald-600 text-white rounded-md text-[13px] font-semibold transition hover:bg-emerald-700 whitespace-nowrap">
           <i class="fas fa-plus mr-1.5"></i>New album
         </button>
       </div>
@@ -50,7 +50,7 @@
 
     <!-- Loading State -->
     <div v-if="loading" class="text-center py-12">
-      <div class="w-10 h-10 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+      <div class="w-10 h-10 border-4 border-gray-200 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4"></div>
       <p>Loading albums...</p>
     </div>
 
@@ -92,7 +92,7 @@
             </template>
           </p>
           <button v-if="canCreateAlbum" @click="showCreateDialog = true"
-            class="bg-blue-500 text-white px-6 py-3 rounded-md text-sm font-semibold shadow-md transition hover:bg-blue-600">
+            class="bg-emerald-500 text-white px-6 py-3 rounded-md text-sm font-semibold shadow-md transition hover:bg-emerald-600">
             <i class="fas fa-plus mr-2"></i>Create Album
           </button>
         </div>
@@ -161,18 +161,18 @@
           <label for="editAlbumName" class="block mb-2 font-medium text-gray-800">Album Name:</label>
           <input id="editAlbumName" v-model="editAlbumName" type="text" placeholder="Enter album name..."
             @keyup.enter="saveAlbum" ref="editAlbumNameInput"
-            class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
+            class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200" />
         </div>
         <div class="mb-6">
           <label for="editAlbumDescription" class="block mb-2 font-medium text-gray-800">Description (optional):</label>
           <textarea id="editAlbumDescription" v-model="editAlbumDescription" placeholder="Enter album description..."
             rows="3"
-            class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 resize-none"></textarea>
+            class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 resize-none"></textarea>
         </div>
         <div class="mb-6">
           <label for="editAlbumMonth" class="block mb-2 font-medium text-gray-800">Month:</label>
           <select id="editAlbumMonth" v-model="editAlbumMonth"
-            class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
+            class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200">
             <option value="">Select month...</option>
             <option value="01">January</option>
             <option value="02">February</option>
@@ -191,7 +191,7 @@
         <div class="mb-6">
           <label for="editAlbumYear" class="block mb-2 font-medium text-gray-800">Year:</label>
           <input id="editAlbumYear" v-model="editAlbumYear" type="number" placeholder="Enter year (e.g., 2025)" min="1900" max="2100"
-            class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200" />
+            class="w-full px-4 py-3 border border-gray-300 rounded-md text-base focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200" />
         </div>
         <div class="mb-6">
           <label class="flex items-center gap-2 text-gray-800">
@@ -205,7 +205,7 @@
             Cancel
           </button>
           <button @click="saveAlbum" :disabled="!editAlbumName.trim() || saving"
-            class="bg-blue-500 text-white px-4 py-3 rounded-md text-sm font-semibold shadow-md transition hover:bg-blue-600 disabled:opacity-60 disabled:cursor-not-allowed min-w-[120px]">
+            class="bg-emerald-500 text-white px-4 py-3 rounded-md text-sm font-semibold shadow-md transition hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed min-w-[120px]">
             {{ saving ? 'Saving...' : 'Save Changes' }}
           </button>
         </div>
