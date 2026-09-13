@@ -43,13 +43,38 @@ sudo smartctl -a /dev/sdb | grep -Ei 'model|overall|reallocated|pending'   # 1T 
 sudo smartctl -a /dev/sdd | grep -Ei 'model|overall|reallocated|pending'   # 465G Hitachi
 ```
 
+> **SMART results (Aug 2026):** sdb (root) ✅ healthy · sdd (Hitachi) ✅ healthy
+> (1 reallocated sector) · **sda (WD Green) ⚠ 104 current pending sectors +
+> past worst=001 — treat as end-of-life.** Do NOT make sda the primary home of
+> hot data — prefer the SSD tier (1.7) and demote sda to cold/backup. If you
+> must stage on it, run `sudo smartctl -t long /dev/sda` first and back up
+> `/mnt/storage` contents. Monitor with
+> `sudo smartctl -a /dev/sda | grep -Ei 'reallocated|pending'`.
+
 ```bash
-# 0.5 Confirm how the cluster reaches mjolnir's MariaDB (run from your workstation):
-#     expect an ExternalName Service or Endpoints → 192.168.1.8:3306
-kubectl -n data get svc mariadb-service -o yaml
+# 0.5 Disk survey — root is 97% full; confirm the root-only consumers (needs sudo)
+sudo du -x -h --max-depth=1 / 2>/dev/null | sort -rh | head -15
+sudo du -sh /var/lib/pve-disks /var/lib/postgres /var/lib/docker /usr 2>/dev/null
+sudo ls -lh /var/lib/pve-disks/images/*/   # Proxmox VM disk sizes
+# Survey (Aug 2026, sudo): /var/lib/media (music) 588G · pve-disks 134G ·
+# legacy /mnt/external/2t 55G (old VM dumps) · minio 15G · home 16G · www 8G ·
+# usr 7.8G · snapd 3G · log 4.3G · cache 2.5G. Music is the space hog.
+# The 2T (/mnt/storage) is 98% free and is where the data should live.
 ```
 
 ## Phase 1 — Reclaim the root disk (97% full)
+
+> **Performance note (moving data from sdb → sda):** sda is a 5400 RPM-class
+> WD "Green" (WD20EARS), sdb is a 7200 RPM Seagate Barracuda (ST1000DM003).
+> Expect ~1.5–2× lower sustained throughput and worse random I/O / latency on
+> sda. Impact by workload: **VM disks — most affected** (they're NFS-served
+> qcow2 disks for the K3s cluster, random-I/O heavy); **MinIO — low** (photo
+> objects are few-MB sequential reads/writes); **MariaDB — negligible** (151M,
+> RAM-cached). Mitigations, best first: **add SATA SSDs and host the hot data
+> there (Phase 1.7)**; otherwise put MinIO + MariaDB on the 7200 RPM Hitachi
+> (sdd) instead of sda; run backup I/O off-hours; optionally disable the WD
+> Green's head-parking to avoid idle latency spikes. Measure before/after:
+> `sudo hdparm -tT /dev/sda /dev/sdb` and `iostat -x 1`.
 
 ### 1.1 Diagnose (read before changing anything)
 
@@ -61,9 +86,13 @@ sudo exportfs -v | head -40          # reconcile live NFS exports (incl. /mnt/ex
 df -hT /mnt/external/2t 2>/dev/null  # is there an external 2T mount we haven't seen?
 ```
 
-These can take a couple of minutes on spinning disks. The likely big consumers:
-`/var/lib/pve-disks` (VM disks), `/var/lib/postgres`, `/var/lib/docker`,
-`/var/lib/minio` (11G), `/home/lucarv`.
+These can take a couple of minutes on spinning disks. Survey results (Aug 2026,
+measured with sudo): root (sdb 1T) is 97% full — `/var/lib/media` (music) 588G,
+`/var/lib/pve-disks` (VMs) 134G, legacy `/mnt/external/2t` 55G (incl. ~54G old
+VM dumps), `/var/lib/minio` 15G, `/home/lucarv` 16G, `/var/www` 8G, `/usr`
+7.8G, `/var/log` 4.3G, `/var/cache` 2.5G, `/var/lib/snapd` 3G, plus <1G of DB
+leftovers. **The music library is the #1 consumer, not the VMs.** The 2T
+(`/mnt/storage`) is 98% free and is where the bulk should live.
 
 ### 1.2 Quick safe cleanups
 
@@ -84,6 +113,15 @@ snap list --all          # look for rows marked 'disabled'
 uname -r
 dpkg --list 'linux-image-*' | grep '^ii'
 # sudo apt-get purge --dry-run $(dpkg --list 'linux-image-*' | awk '/^ii/{print $2}' | grep -v "$(uname -r)")
+
+# stale MinIO temp staging dir (3.5G) — inspect, then remove if it's leftover
+du -sh /home/lucarv/minio-temp
+# rm -rf /home/lucarv/minio-temp     # only if contents are stale temp output
+
+# legacy /mnt/external/2t shell on root (51G) — review, then move or prune
+du -sh /mnt/external/2t/*
+# e.g. sudo mv /mnt/external/2t/ebooks /mnt/storage/    # keep what you want
+#      sudo rm -rf /mnt/external/2t/container-registry  # if superseded by local-registry
 ```
 
 ### 1.3 Move MinIO data off root → bind-mount from `/mnt/storage`
@@ -135,16 +173,17 @@ sudo systemctl start mariadb
 sudo mariadb -e 'SELECT 1;'   # verify (root socket auth)
 ```
 
-### 1.5 If `/var/lib/pve-disks` (or postgres/docker) is the real consumer
+### 1.5 Move the Proxmox VM disks off root (the real fix)
 
-From 1.1 you'll know. The PVE VM disks (`/var/lib/pve-disks/images/`, VMIDs
-100–107) are **live disks in use by a Proxmox cluster** — do **not** move them
-by hand.
-
-Recommended (hypervisor-level, separate project):
+Surveyed (Aug 2026, sudo): the VM disks under `/var/lib/pve-disks/images/`
+(VMIDs 100–107) use **134G** on the 1T root disk (sparse raw files). They are
+**live disks in use by a Proxmox cluster** — do **not** move them by hand.
+Note: the single biggest consumer is actually the **music library**
+(`/var/lib/media/music`, 588G) — see the music-backup discussion; the VM move
+below is still worthwhile but secondary in size.
 
 ```bash
-# On mjolnir: new export backed by the big disk
+# On mjolnir: create the new export on the 2T disk
 sudo mkdir -p /mnt/storage/pve-disks
 echo '/mnt/storage/pve-disks 192.168.1.0/24(rw,async,no_subtree_check,no_root_squash)' | sudo tee -a /etc/exports
 sudo exportfs -ra
@@ -152,12 +191,21 @@ sudo exportfs -ra
 
 ```bash
 # On the Proxmox node: add NFS storage → mjolnir:/mnt/storage/pve-disks,
-# then migrate each VM's disk, then verify + delete the old copy:
+# then migrate each VM's disk (one VM at a time), verify, then remove the old:
 qm move-disk <vmid> scsi0 <new-storage-name>
 ```
 
-If VM disks are *not* the consumer, 1.2 + 1.3 typically free 30–50 GB and buy
-plenty of time; revisit 1.5 when root usage creeps back.
+After all VMs are migrated:
+
+```bash
+# On mjolnir: stop exporting the old root-disk path, then confirm it's empty
+sudo sed -i '\#/var/lib/pve-disks#d' /etc/exports && sudo exportfs -ra
+sudo du -sh /var/lib/pve-disks     # ~0 after the move; reclaims the space
+```
+
+If 0.5 shows postgres/docker/usr are the real consumers instead, then 1.2 + 1.3
+still buy headroom, but those dirs should also eventually end up on
+`/mnt/storage` (same bind-mount pattern as 1.3/1.4).
 
 ### 1.6 Verify Phase 1
 
@@ -167,12 +215,55 @@ df -h /    # should be comfortably below 90%
 mc ls mjolnir/photovault | tail
 ```
 
+### 1.7 Optional — SSD tier (recommended if you're adding SATA SSDs)
+
+If you install the SSDs **internally via SATA**, make them the primary
+destination for the hot data instead of `/mnt/storage`. Native SATA means full
+speed, reliable TRIM, and none of the USB-enclosure caveats.
+
+**Role split:**
+- **SSD(s)** → Proxmox VM disks (biggest win) + MinIO + MariaDB (hot, small).
+- **sdb (Barracuda)** → OS (keep as-is — no benefit to moving it).
+- **sda (WD Green)** → bulk/cold only (ebooks, archives, pve-backups) + backups —
+  **⚠ 104 pending SMART sectors (Aug 2026): treat as end-of-life, not primary data.**
+- **sdd (Hitachi)** → `/mnt/backup` (Phase 2.1), i.e. backups of the SSD data.
+
+**Capacity check (measured Aug 2026):** VM disks ≈ 134G · music 588G ·
+MinIO 15G → one 1T SSD covers the VMs + MinIO; the **music library (588G)**
+is the item that really needs a big disk — it's the root-disk hog.
+
+```bash
+# 1) Identify the new drives (ROTA=0 ⇒ SSD) and confirm TRIM is exposed
+lsblk -d -o NAME,MODEL,ROTA,SIZE
+lsblk -D /dev/sdX                 # DISC-GRAN/DISC-MAX present = TRIM works
+sudo systemctl enable --now fstrim.timer
+
+# 2) Partition + format + mount by UUID (example: the largest SSD)
+sudo parted -s /dev/sdX mklabel gpt
+sudo parted -s /dev/sdX mkpart primary ext4 0% 100%
+sudo mkfs.ext4 -F /dev/sdX1
+sudo mkdir -p /mnt/ssd
+echo "UUID=$(sudo blkid -s UUID -o value /dev/sdX1) /mnt/ssd ext4 defaults,noatime 0 2" \
+  | sudo tee -a /etc/fstab
+sudo mount -a
+df -h /mnt/ssd
+```
+
+**Then redo 1.3 / 1.4 / 1.5 pointing at `/mnt/ssd` instead of `/mnt/storage`:**
+- MinIO: `mv /var/lib/minio → /mnt/ssd/minio` (bind mount, per 1.3)
+- MariaDB: `mv /var/lib/mysql → /mnt/ssd/mysql` (bind mount, per 1.4)
+- VM disks: new NFS export `/mnt/ssd/pve-disks` + `qm move-disk` (per 1.5)
+
 ## Phase 2 — Backups (currently none)
 
-### 2.1 Mount the spare 465 GB disk (`sdd1`) as the backup target
+### 2.1 Claim the orphaned 465 GB disk (`sdd1`) as the backup target
 
-After Phase 1, live data sits on sda and backups go on sdd → two different
-physical disks (protects against single-disk loss, not whole-box loss — see 2.5).
+Survey finding: `sdd1` (Hitachi, UUID `f872dc5b`) is **not mounted** — two
+fstab entries claim `/mnt/external/cache`, and the stale one (`6BDE-BC1A`, a
+device that no longer exists) shadows the real one. Fix fstab and mount it at
+`/mnt/backup`. After Phase 1, live data sits on sda (or the SSD tier, Phase
+1.7) and backups go on sdd → two different physical disks (protects against
+single-disk loss, not whole-box loss — see 2.5).
 
 ```bash
 # Inspect sdd1 first — spare or does it hold data?
@@ -181,7 +272,8 @@ sudo mkdir -p /mnt/backup
 sudo mount /dev/sdd1 /mnt/backup
 sudo ls -la /mnt/backup    # if it has old data, keep it — do NOT format
 
-# Persist by UUID
+# Fix fstab: drop both stale /mnt/external/cache lines, mount sdd1 at /mnt/backup
+sudo sed -i '\#/mnt/external/cache#d' /etc/fstab
 echo "UUID=$(sudo blkid -s UUID -o value /dev/sdd1) /mnt/backup ext4 defaults,noatime 0 2" \
   | sudo tee -a /etc/fstab
 sudo mount -a
@@ -251,8 +343,8 @@ grep -c 'CREATE DATABASE.*photovault' /mnt/backup/mariadb/all-*.sql
 ```
 
 > No in-cluster DB dump is needed: the cluster's `mariadb-service`
-> (`data` namespace) is a Service that forwards to this MariaDB
-> (confirm with `kubectl -n data get svc mariadb-service -o yaml`).
+> (`data` namespace) is a selectorless Service whose Endpoints point at
+> `192.168.1.8:3306` (confirmed).
 
 ### 2.4 Schedule with cron
 
@@ -312,9 +404,12 @@ sudo ufw allow from 192.168.1.0/24 to any port 445 proto tcp
 sudo ufw allow from 192.168.1.0/24 to any port 5000 proto tcp   # docker registry
 sudo ufw allow from 192.168.1.0/24 to any port 5432 proto tcp   # postgres, if LAN clients
 sudo ufw allow from 192.168.1.0/24 to any port 3389 proto tcp   # xrdp, if you use it
-# MariaDB :3306 — REQUIRED. This IS PhotoVault's DB: pv-api reaches it via
-# the in-cluster `mariadb-service` (data ns), which forwards to mjolnir:3306.
-# Allow the cluster nodes; add the pod CIDR too if the Service doesn't SNAT.
+# MariaDB :3306 — REQUIRED. This IS PhotoVault's DB. Confirmed: the cluster's
+# selectorless `mariadb-service` (data ns) has Endpoints → 192.168.1.8:3306.
+# Allow the cluster nodes (kube-proxy SNAT → node IP) + the pod CIDR as
+# belt-and-suspenders in case masquerade is ever disabled.
+# (The `v1 Endpoints` deprecation warning is benign — Endpoints are auto-
+#  mirrored to EndpointSlices, which is what kube-proxy reads. No action needed.)
 sudo ufw allow from 192.168.1.0/24 to any port 3306 proto tcp
 sudo ufw allow from 10.42.0.0/16 to any port 3306 proto tcp
 ```
@@ -369,19 +464,28 @@ MinIO data is never deleted by this plan — the original tree is preserved at
 
 ## Open decisions for you
 
-1. **Is `/mnt/external/2t` a real mount?** It appeared in `exportfs`/`showmount`
-   but not in `lsblk`. If it exists, it is an even better backup target than sdd
-   (check with `df -hT /mnt/external/2t`).
-2. **Are the k3s nodes VMs on disks from `/var/lib/pve-disks`?** Check from
-   inside a node (`df -hT /`); if yes, Phase 1.5 is the real long-term fix for
-   the root disk.
-3. **Cluster → mjolnir traffic**: pods reach MinIO (:9000) and MariaDB (:3306)
-   directly, so UFW must allow the cluster source ranges (LAN node IPs
-   `192.168.1.0/24` and, if the Service doesn't SNAT, the pod CIDR
-   `10.42.0.0/16`). Traffic between pods in-cluster (e.g. pv-api ↔ Temporal)
-   is untouched by UFW.
-4. **Off-box target for 2.5**: pick a host (heimdal/loki/another machine) or a
+1. **Legacy `/mnt/external/2t` dir (resolved — not a mount):** it's a leftover
+   shell on root holding 51G from before the 2T disk moved to `/mnt/storage`.
+   Decision: move what you want (`ebooks/`, `container-registry/`) to
+   `/mnt/storage`, delete the rest (see Phase 1.2).
+2. **PVE VM disks** — confirmed on the root disk (VMIDs 100–107). Phase 1.5
+   (move to `/mnt/storage/pve-disks`) is the real fix; run Phase 0.5 first to
+   size them. Also check `df -hT /` inside a node to see if it's NFS-rooted
+   from `/var/lib/pve-disks`.
+3. **Stale PVE NFS mounts** — PVE clients still mount
+   `/mnt/external/2t/pve-backups`, which is no longer exported. Remount to
+   `/mnt/storage/pve-backups` on the PVE side (or repoint the storage config in
+   the Proxmox UI).
+4. **Cluster → mjolnir traffic**: pods reach MinIO (:9000) and MariaDB (:3306)
+   directly (MariaDB via the selectorless `mariadb-service` Endpoints →
+   `192.168.1.8:3306`). UFW allows LAN node IPs (`192.168.1.0/24`) plus the pod
+   CIDR (`10.42.0.0/16`) as belt-and-suspenders. Pod↔pod traffic (e.g. pv-api ↔
+   Temporal) is untouched by UFW.
+5. **Off-box target for 2.5**: pick a host (heimdal/loki/another machine) or a
    cloud/Backblaze target for the rclone copy.
+6. **SATA SSDs (Phase 1.7)** — if you install them, they take over as the
+   primary destination for VM disks + MinIO + MariaDB; sda then holds only
+   bulk/cold data and backups, and the Hitachi stays the `/mnt/backup` disk.
 
 
 

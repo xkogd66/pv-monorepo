@@ -351,6 +351,18 @@ Albums carry an optional **year** and **month** that describe the album's conten
 - An empty year-filter result shows "No Albums in {year}" instead of the generic empty state.
 - `AlbumCard.vue` renders a small year badge next to the photo count when `album.year` is set.
 
+**SPA sort (`Albums.vue` `sortedAlbums`):** six options in one `<select>`, default `year-desc`.
+- **Chronological** (`year-desc` "Newest first" / `year-asc` "Oldest first") compares the
+  album content date — `year` first, then `month` — not `created_at`/`updated_at`. This is
+  the default, so the grid lands newest-first by album date.
+- **Modified** (`modified-desc` "Recently modified" / `modified-asc` "Least recently
+  modified") compares `updated_at`, surfaced to the SPA as `lastModified` in `loadAlbums()`.
+- **Name** (`name-asc` / `name-desc`) is a plain `localeCompare`.
+- Missing values sort **last in both directions**: an album with `year = NULL` never
+  interleaves with dated albums, and within a year an album with `month = NULL` follows
+  ones that have a month. `compareYearMonth` / `compareModified` take a `dir` (`-1` for a
+  `-desc` option, `+1` for `-asc`) so each pair shares one comparator.
+
 **`PUT /album/:currentName` (admin) — update semantics:**
 Accepts `newName`, `description`, `month`, `year` in the body. Behavior depends on the name:
 - **Name unchanged** (or omitted) → metadata-only update of `description`/`month`/`year`
@@ -466,7 +478,8 @@ Redesigned 2026-08-28 from centred icon-tiles to a cover-led grid.
 **Card anatomy:** a 4:3 cover (`aspect-[4/3]`, `rounded-lg`, `object-cover`) with the
 caption beneath — name on one truncated line, then a single metadata line
 (`36 photos · 2026`). There is no card border, no shadow and no `lastModified` on the
-card face; the modified date remains available through sorting. Long album names
+card face; the modified date remains available through the `modified-desc` /
+`modified-asc` sort options. Long album names
 truncate rather than wrap — that is what keeps grid rows the same height.
 
 **Three cover states**, in `AlbumCard.vue`: the presigned photo; a dashed "No photos
@@ -475,7 +488,8 @@ but 404s (`coverFailed`).
 
 **Toolbar:** an `Albums` heading with a live count (`summaryLine`, which counts what
 the year filter is actually showing), then one year `<select>`, one sort `<select>`
-(four options, replacing four buttons), an icon-only refresh, and "New album".
+(six options — chronological album date (default), last-modified, and name — replacing
+four buttons), an icon-only refresh, and "New album".
 
 **Responsive rules that matter:**
 - Grid is `grid-cols-2 md:grid-cols-3 lg:grid-cols-4`. Two columns on phone is

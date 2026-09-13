@@ -30,8 +30,10 @@
           title="Sort albums"
           class="flex-1 sm:flex-none min-w-0 h-11 sm:h-[34px] px-2.5 text-sm sm:text-[13px] border border-gray-200 rounded-lg sm:rounded-md bg-white text-gray-700 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
         >
-          <option value="date-desc">Newest first</option>
-          <option value="date-asc">Oldest first</option>
+          <option value="year-desc">Newest first</option>
+          <option value="year-asc">Oldest first</option>
+          <option value="modified-desc">Recently modified</option>
+          <option value="modified-asc">Least recently modified</option>
           <option value="name-asc">Name A&ndash;Z</option>
           <option value="name-desc">Name Z&ndash;A</option>
         </select>
@@ -242,7 +244,7 @@ const saving = ref(false)
 const albumToDelete = ref(null)
 const albumToEdit = ref(null)
 const editAlbumNameInput = ref(null)
-const sortOrder = ref('date-desc')
+const sortOrder = ref('year-desc')
 const selectedYear = ref(null)
 const currentPage = ref(1)
 const itemsPerPage = ref(24)
@@ -269,18 +271,42 @@ const summaryLine = computed(() => {
   return `${count} ${count === 1 ? 'album' : 'albums'} · ${photos.toLocaleString()} photos`;
 });
 
-// Computed property for sorted albums (sorts within the year-filtered set)
+// Albums with a missing value always sort last, in both directions.
+const compareYearMonth = (a, b, dir) => {
+  const aHasYear = a.year != null
+  const bHasYear = b.year != null
+  if (aHasYear !== bHasYear) return aHasYear ? -1 : 1
+  if (!aHasYear) return 0 // neither dated — keep stable order
+  if (a.year !== b.year) return dir * (a.year - b.year)
+
+  const aHasMonth = a.month != null
+  const bHasMonth = b.month != null
+  if (aHasMonth !== bHasMonth) return aHasMonth ? -1 : 1
+  if (!aHasMonth) return 0
+  return dir * (a.month - b.month)
+}
+
+const compareModified = (a, b, dir) => {
+  const at = a.lastModified ? new Date(a.lastModified).getTime() : null
+  const bt = b.lastModified ? new Date(b.lastModified).getTime() : null
+  if (at == null && bt == null) return 0
+  if (at == null) return 1
+  if (bt == null) return -1
+  return dir * (at - bt)
+}
+
+// Computed property for sorted albums (sorts within the year-filtered set).
+// `dir` is -1 for a `-desc` option, +1 for `-asc`, so each pair shares one comparator.
 const sortedAlbums = computed(() => {
+  const dir = sortOrder.value.endsWith('-desc') ? -1 : 1
   return [...filteredAlbums.value].sort((a, b) => {
     switch (sortOrder.value) {
-      case 'date-desc':
-        if (!a.lastModified) return 1
-        if (!b.lastModified) return -1
-        return new Date(b.lastModified) - new Date(a.lastModified)
-      case 'date-asc':
-        if (!a.lastModified) return 1
-        if (!b.lastModified) return -1
-        return new Date(a.lastModified) - new Date(b.lastModified)
+      case 'year-desc':
+      case 'year-asc':
+        return compareYearMonth(a, b, dir)
+      case 'modified-desc':
+      case 'modified-asc':
+        return compareModified(a, b, dir)
       case 'name-asc':
         return a.name.localeCompare(b.name)
       case 'name-desc':

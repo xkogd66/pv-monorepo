@@ -217,8 +217,12 @@ a single point of failure for all of these.
 > MariaDB databases confirmed on mjolnir: **`photovault`** (`albums` + `users`
 > — PhotoVault's store), plus `guacamole_db` and `harp_db` for other apps.
 > pv-api reaches this server through the cluster DNS name
-> `mariadb-service.data.svc.cluster.local` (namespace `data`), which is a
-> Service that forwards to `mjolnir:3306`.
+> `mariadb-service.data.svc.cluster.local` (namespace `data`) — a selectorless
+> Service whose Endpoints point at `192.168.1.8:3306` (confirmed via
+> `kubectl -n data get endpoints mariadb-service`). The `v1 Endpoints`
+> deprecation warning (k8s ≥ 1.33) is benign — Endpoints objects are still
+> supported and are auto-mirrored to the EndpointSlices that kube-proxy
+> actually consumes; no action needed.
 
 > Observed via read-only SSH, Aug 2026. No destructive commands run.
 
@@ -231,19 +235,39 @@ a single point of failure for all of these.
 
 **Storage layout** (plain ext4 — no ZFS, no mdadm RAID):
 
-| Disk | Size | Filesystem / mount | Usage |
-|---|---|---|---|
-| `sda1` | 1.8 TB | ext4 → `/mnt/storage` | ~27 GB used / 1.7 TB free — big data disk |
-| `sdb2` | 931 GB | ext4 → `/` (root) | **839 GB / 916 GB used — 97% full, 31 GB free** |
-| `sdb1` | 512 MB | vfat → `/boot/efi` | boot |
-| `sdc` | 0 B | — | empty slot |
-| `sdd1` | 465 GB | ext4 → *(unmounted)* | spare, not in use |
+| Disk (model) | Part / UUID | Size | Mount | Status |
+|---|---|---|---|---|
+| `sda` — WD WD20EARS (Green) | `sda1` `e94fd5bb-…` | 1.8 TB (2T) | `/mnt/storage` | **designated data disk** — 27 GB used / 1.7 TB free · ⚠ **104 current pending sectors** (SMART, Aug 2026) — end-of-life, cold/backup only |
+| `sdb` — Seagate ST1000DM003 | `sdb2` `6a327496-…` | 931 GB (1T) | `/` (root) | **97% full** (839/916 GB) — OS + everything important |
+| `sdb` (same) | `sdb1` `F3A7-FE16` | 512 MB | `/boot/efi` | boot |
+| `sdc` — MassStorageClass | — | 0 B | — | card reader, empty |
+| `sdd` — Hitachi HDS721050CLA662 | `sdd1` `f872dc5b-…` | 465 GB | *(unmounted)* | **orphaned** — fstab maps it to `/mnt/external/cache`, but a stale duplicate fstab entry shadows it · SMART healthy (1 reallocated sector) |
 
+**Root-disk consumer breakdown** (measured with sudo, Aug 2026):
+`/var/lib/media` (music) **588G** · `/var/lib/pve-disks` (VMs) **134G** ·
+`/mnt/external/2t` legacy dirs 55G (incl. ~54G old VM dumps) ·
+`/var/lib/minio` 15G · `/home/lucarv` 16G (incl. a 4.3G stale minio tarball) ·
+`/var/www` 8G · `/usr` 7.8G · `/var/log` 4.3G · `/var/cache` 2.5G ·
+`/var/lib/snapd` 3G · DB leftovers (`mysql-11.1`, `mariadb_backup_20251226`,
+`mysql-empty`) <1G.
+
+- The 2T disk's UUID `e94fd5bb` was previously mounted at `/mnt/external/2t`
+  ("coco's old huge 2T disk" per fstab comment) and now lives at `/mnt/storage`.
+  The old `/mnt/external/2t` dir on root still holds ~51G of legacy data
+  (`ebooks/`, `container-registry/`, `pve-backups/`, `slask/` + a
+  `storage -> /mnt/storage` symlink).
+- **fstab bug:** two entries claim `/mnt/external/cache` — `6BDE-BC1A` (a vfat
+  UUID for a device that no longer exists) and `f872dc5b` (the Hitachi sdd1).
+  The stale entry shadows the mount, so the 465G disk is never mounted.
+- **Stale NFS mounts:** PVE clients still mount `/mnt/external/2t/pve-backups`
+  (`showmount -a`), but the live export table now serves
+  `/mnt/storage/pve-backups` — the PVE-side mounts are stale.
+- The Proxmox VM disks live under `/var/lib/pve-disks/images/` (VMIDs 100–107)
+  **on the root disk** (134G, sparse raw files). **The single biggest consumer
+  is the music library** `/var/lib/media/music` (588G) — it, plus the VMs, is
+  why the root disk is 97% full.
 - `/mnt/storage` holds `onedrive-kat` (17G), `slask/` (138M — the PhotoVault
   upload staging share, see below), `iot/`, `media-backups/`, `pve-backups/`.
-- The K3s VM disks live under `/var/lib/pve-disks/images/` (VMIDs 100–107) —
-  the likely cause of the root disk being 97% full (exact breakdown not
-  enumerated; full-disk scans time out on this box).
 
 **PhotoVault-relevant services** (native systemd units, not containers):
 
