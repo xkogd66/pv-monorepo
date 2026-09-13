@@ -349,7 +349,9 @@ Albums carry an optional **year** and **month** that describe the album's conten
 - The pipeline is `filteredAlbums` → `sortedAlbums` → `paginatedAlbums`; sorting and
   pagination compose with the filter. Selecting a year resets to page 1.
 - An empty year-filter result shows "No Albums in {year}" instead of the generic empty state.
-- `AlbumCard.vue` renders a small year badge next to the photo count when `album.year` is set.
+- `AlbumCard.vue`'s caption carries the album date next to the photo count — one
+  `metaLine` (`36 photos · May 2026` from `month` + `year`), not a separate badge, and
+  either value silently drops out when missing (see the Album Grid section below).
 
 **SPA sort (`Albums.vue` `sortedAlbums`):** six options in one `<select>`, default `year-desc`.
 - **Chronological** (`year-desc` "Newest first" / `year-asc` "Oldest first") compares the
@@ -492,6 +494,14 @@ but 404s (`coverFailed`).
 the year filter is actually showing), then one year `<select>`, one sort `<select>`
 (six options — chronological album date (default), last-modified, and name — replacing
 four buttons), an icon-only refresh, and "New album".
+
+The whole toolbar is `sticky top-16 z-20` — pinned directly under the 64px `AppHeader`
+(`z-30`) so the year/sort selects stay reachable while the grid scrolls, the same pattern
+`AlbumHeader.vue` uses (`top-16`). It carries an opaque `bg-gray-50` plus a `border-b` so
+cards scroll *behind* it rather than through it, and `-mx-4 px-4` widens that background
+across the container's own padding so nothing shows through beside the controls. Sticky
+works because no ancestor sets `overflow` (`#app` and `body` are clean); the only
+`overflow: hidden` in the app is the `.sr-only` utility.
 
 **Responsive rules that matter:**
 - Grid is `grid-cols-2 md:grid-cols-3 lg:grid-cols-4`. Two columns on phone is

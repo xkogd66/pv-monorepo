@@ -1,6 +1,9 @@
 <template>
   <div class="max-w-[1200px] mx-auto px-4 py-8">
-    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8 sm:mb-9">
+    <!-- Toolbar: pinned under the 64px app header while the grid scrolls (same
+         sticky pattern as AlbumHeader.vue). -mx-4/px-4 lets its gray-50 background
+         span the container padding so cards never show through beside it. -->
+    <div class="sticky top-16 z-20 -mx-4 px-4 pt-2 pb-3 mb-6 sm:mb-7 bg-gray-50 border-b border-gray-200 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
       <div class="flex items-end justify-between gap-4">
         <div class="min-w-0">
           <h1 class="text-2xl font-semibold tracking-tight text-gray-900">Albums</h1>
