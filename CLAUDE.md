@@ -477,7 +477,9 @@ Redesigned 2026-08-28 from centred icon-tiles to a cover-led grid.
 
 **Card anatomy:** a 4:3 cover (`aspect-[4/3]`, `rounded-lg`, `object-cover`) with the
 caption beneath — name on one truncated line, then a single metadata line
-(`36 photos · 2026`). There is no card border, no shadow and no `lastModified` on the
+(`36 photos · May 2026`, built by `AlbumCard.vue`'s `metaLine` from `fileCount` plus a
+`month`/`year` date segment; a missing month or year just drops out, so an album with a
+year only still reads `36 photos · 2026`). There is no card border, no shadow and no `lastModified` on the
 card face; the modified date remains available through the `modified-desc` /
 `modified-asc` sort options. Long album names
 truncate rather than wrap — that is what keeps grid rows the same height.

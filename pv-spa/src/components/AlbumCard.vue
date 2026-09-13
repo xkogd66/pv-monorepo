@@ -126,10 +126,23 @@ const isEmpty = computed(() => !(props.album.fileCount || 0))
 
 const hasActions = computed(() => props.canRename || props.canDelete)
 
+// Full month names — matches the labels in CreateAlbumDialog.vue / the Albums edit dialog.
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+]
+
 const metaLine = computed(() => {
   const count = props.album.fileCount || 0
   const parts = [count === 0 ? 'Empty' : `${count} ${count === 1 ? 'photo' : 'photos'}`]
-  if (props.album.year) parts.push(String(props.album.year))
+
+  // Month and year collapse into one date segment ("May 2026") so the line keeps
+  // exactly one " · " separator. Missing month or year simply drops out.
+  const month = props.album.month
+  const monthName = month >= 1 && month <= 12 ? MONTH_NAMES[month - 1] : null
+  const dateLabel = [monthName, props.album.year].filter(Boolean).join(' ')
+  if (dateLabel) parts.push(dateLabel)
+
   return parts.join(' · ')
 })
 
