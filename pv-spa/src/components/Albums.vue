@@ -72,7 +72,7 @@
     <div v-if="!loading && !error">
       <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-5 sm:gap-x-6 sm:gap-y-8">
         <AlbumCard
-          v-for="album in paginatedAlbums"
+          v-for="album in visibleAlbums"
           :key="album.name"
           :album="album"
           :can-rename="canRenameAlbum"
@@ -103,25 +103,17 @@
         </div>
       </div>
 
-      <!-- Pagination Controls -->
-      <div v-if="totalPages > 1" class="flex justify-center items-center gap-2 mt-8">
-        <button
-          @click="goToPage(currentPage - 1)"
-          :disabled="currentPage === 1"
-          class="px-3 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <i class="fas fa-chevron-left"></i>
-        </button>
-        <span class="text-sm text-gray-600">
-          Page {{ currentPage }} of {{ totalPages }}
-        </span>
-        <button
-          @click="goToPage(currentPage + 1)"
-          :disabled="currentPage === totalPages"
-          class="px-3 py-2 bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <i class="fas fa-chevron-right"></i>
-        </button>
+      <!-- Infinite scroll sentinel — always in DOM (v-show, not v-if) so the
+           observer's element reference stays stable across batches. -->
+      <div
+        ref="scrollTrigger"
+        v-show="hasMoreAlbums"
+        class="h-12 flex items-center justify-center"
+      >
+        <svg v-if="isLoadingMore" class="animate-spin h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
       </div>
     </div>
 
@@ -220,7 +212,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
 import apiService from '../services/api.js'
 import authService from '../services/auth.js'
 import CreateAlbumDialog from './CreateAlbumDialog.vue'
@@ -249,8 +241,13 @@ const albumToEdit = ref(null)
 const editAlbumNameInput = ref(null)
 const sortOrder = ref('year-desc')
 const selectedYear = ref(null)
-const currentPage = ref(1)
-const itemsPerPage = ref(24)
+
+// Infinite scroll: how many albums of `sortedAlbums` are currently rendered.
+// The full album list is fetched once (see loadAlbums) — growing this number is
+// a synchronous slice, so scrolling never hits the network.
+const ITEMS_PER_PAGE = 24
+const visibleCount = ref(ITEMS_PER_PAGE)
+const isLoadingMore = ref(false)
 // Distinct years across all albums (most recent first) — drives the year filter dropdown
 const availableYears = computed(() => {
   const years = new Set(
@@ -320,17 +317,45 @@ const sortedAlbums = computed(() => {
   })
 })
 
-// Computed property for paginated albums
-const paginatedAlbums = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage.value
-  const end = start + itemsPerPage.value
-  return sortedAlbums.value.slice(start, end)
+// Albums currently rendered — a window that only ever grows as the user scrolls
+const visibleAlbums = computed(() => {
+  return sortedAlbums.value.slice(0, visibleCount.value)
 })
 
-// Computed property for total pages
-const totalPages = computed(() => {
-  return Math.ceil(sortedAlbums.value.length / itemsPerPage.value)
+const hasMoreAlbums = computed(() => {
+  return visibleCount.value < sortedAlbums.value.length
 })
+
+const loadMore = () => {
+  if (isLoadingMore.value || !hasMoreAlbums.value) return
+  isLoadingMore.value = true
+  visibleCount.value = Math.min(
+    visibleCount.value + ITEMS_PER_PAGE,
+    sortedAlbums.value.length
+  )
+  isLoadingMore.value = false
+}
+
+// Observer on the sentinel at the bottom of the grid. The sentinel uses v-show,
+// not v-if: v-if would destroy and recreate the element on each batch, breaking
+// the DOM reference the observer holds.
+const scrollTrigger = ref(null)
+let observer = null
+
+const setupObserver = () => {
+  if (!scrollTrigger.value) return
+  observer = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting && hasMoreAlbums.value && !isLoadingMore.value) {
+      loadMore()
+    }
+  }, { rootMargin: '200px' })
+  observer.observe(scrollTrigger.value)
+}
+
+const teardownObserver = () => {
+  observer?.disconnect()
+  observer = null
+}
 
 // Computed properties for permission checks
 const canCreateAlbum = computed(() => {
@@ -374,6 +399,10 @@ const loadAlbums = async () => {
       })
 
       albums.value = albumsWithDates
+      // The list was just replaced wholesale — rewind to the first batch. A
+      // preserved scroll position would point at whatever slid into that slot,
+      // and after a create/edit/delete the ordering itself may have changed.
+      visibleCount.value = ITEMS_PER_PAGE
     } else {
       throw new Error(response.error || 'Failed to load albums - API returned unsuccessful response')
     }
@@ -524,12 +553,6 @@ const refreshAlbums = async () => {
   await loadAlbums()
 }
 
-const goToPage = (page) => {
-  if (page >= 1 && page <= totalPages.value) {
-    currentPage.value = page
-  }
-}
-
 const focusEditInput = async () => {
   await nextTick()
   if (editAlbumNameInput.value) {
@@ -545,17 +568,20 @@ watch(showEditDialog, (newVal) => {
 })
 
 watch(sortOrder, () => {
-  currentPage.value = 1
+  visibleCount.value = ITEMS_PER_PAGE
 })
 
 watch(selectedYear, () => {
-  currentPage.value = 1
+  visibleCount.value = ITEMS_PER_PAGE
 })
 
 // Lifecycle
 onMounted(() => {
   loadAlbums()
+  setupObserver()
 })
+
+onUnmounted(teardownObserver)
 </script>
 
 <style scoped>

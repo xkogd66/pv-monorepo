@@ -22,6 +22,23 @@ Do not attempt to visually verify UI changes yourself (screenshots, headless bro
 
 Always explain the reasoning behind a change before or alongside making it — not just what was edited, but what problem it solves, why this approach over alternatives, and any capability or behavior being traded away (especially when removing/replacing existing functionality). Don't let a removed capability surface later as a bug report — flag it up front.
 
+This applies to **decisions**: what was chosen, why, and what it costs. It does not mean narrating your own tool calls — see Output Style.
+
+---
+
+## Output Style
+
+Say less. The user reads the diff and the command output, not a transcript of your intentions.
+
+- **No pre-tool narration.** Never announce a tool call ("let me check X", "now I'll read Y", "I need to look at Z"). Call the tool.
+- **No post-tool narration.** Don't restate a result the user can already see in the tool output.
+- **Batch independent tool calls** into one turn rather than serializing them one at a time. Fewer round-trips, less scroll.
+- **Status prose only when it earns its place:** a decision you are making, a blocker, or a long-running operation that needs expectation-setting. Otherwise emit nothing between tool calls.
+- **Final summary:** what changed, what you verified, what you assumed or could not verify. Not a play-by-play of the steps taken.
+- **Report errors and surprises immediately** — that prose always earns its place.
+
+Still required: the Explain Reasoning rule above, blockers, destructive-action warnings, and anything the user must run themselves (Cluster Access, Visual Verification).
+
 ---
 
 ## Repository Structure
@@ -346,8 +363,11 @@ Albums carry an optional **year** and **month** that describe the album's conten
 - A "Year:" dropdown filters the grid to albums whose `year` matches the selection.
   Options are the distinct non-null years across all albums, sorted most-recent-first.
 - Albums with `year = NULL` appear only under "All years".
-- The pipeline is `filteredAlbums` → `sortedAlbums` → `paginatedAlbums`; sorting and
-  pagination compose with the filter. Selecting a year resets to page 1.
+- The pipeline is `filteredAlbums` → `sortedAlbums` → `visibleAlbums`; sorting and
+  the visible window compose with the filter. Selecting a year (or changing the sort)
+  rewinds the window to the first batch, as does `loadAlbums()` after a
+  create/edit/delete/refresh — the list is replaced wholesale, so a preserved scroll
+  position would point at whatever slid into that slot.
 - An empty year-filter result shows "No Albums in {year}" instead of the generic empty state.
 - `AlbumCard.vue`'s caption carries the album date next to the photo count — one
   `metaLine` (`36 photos · May 2026` from `month` + `year`), not a separate badge, and
@@ -502,6 +522,21 @@ cards scroll *behind* it rather than through it, and `-mx-4 px-4` widens that ba
 across the container's own padding so nothing shows through beside the controls. Sticky
 works because no ancestor sets `overflow` (`#app` and `body` are clean); the only
 `overflow: hidden` in the app is the `.sr-only` utility.
+
+**Scrolling:** the grid is infinite-scroll, not paginated (it used to render a
+`Math.ceil(len / 24)` page window with prev/next buttons). `visibleAlbums` is a
+`slice(0, visibleCount)` of `sortedAlbums` — a window that only grows — and a sentinel
+`<div ref="scrollTrigger">` at the end of the grid drives `loadMore()` through an
+`IntersectionObserver` (`rootMargin: '200px'`). The sentinel uses `v-show`, not `v-if`:
+`v-if` would destroy and recreate the element per batch and break the observer's DOM
+reference. All albums are still fetched in the one `GET /albums` call, so growing the
+window never hits the network. There is deliberately **no** "Showing X of Y" footer.
+
+Tradeoffs of dropping the page buttons: there is no longer any position indicator and no
+way to jump to the end, and the DOM grows unbounded as batches append (acceptable at
+`ITEMS_PER_PAGE: 24` for a personal gallery). Page state was never serialised to the URL
+or a store, so nothing lost a deep-link, but "link to the middle of the list" is no longer
+expressible.
 
 **Responsive rules that matter:**
 - Grid is `grid-cols-2 md:grid-cols-3 lg:grid-cols-4`. Two columns on phone is
