@@ -343,13 +343,31 @@ const scrollTrigger = ref(null)
 let observer = null
 
 const setupObserver = () => {
-  if (!scrollTrigger.value) return
+  console.log('[SCROLL DIAG] setupObserver called, sentinel =', scrollTrigger.value)
+  if (!scrollTrigger.value) {
+    console.warn('[SCROLL DIAG] sentinel is NULL — observer not attached')
+    return
+  }
+  console.log('[SCROLL DIAG] at setup: sortedAlbums.length =', sortedAlbums.value.length,
+    '| visibleCount =', visibleCount.value,
+    '| hasMore =', hasMoreAlbums.value)
   observer = new IntersectionObserver((entries) => {
+    console.log('[SCROLL DIAG] observer fired: isIntersecting =', entries[0].isIntersecting,
+      '| ratio =', entries[0].intersectionRatio,
+      '| hasMore =', hasMoreAlbums.value,
+      '| isLoadingMore =', isLoadingMore.value,
+      '| visibleCount =', visibleCount.value,
+      '| rootBounds =', entries[0].rootBounds ? 'set' : 'null',
+      '| boundingClientRect.top =', entries[0].boundingClientRect?.top)
     if (entries[0].isIntersecting && hasMoreAlbums.value && !isLoadingMore.value) {
+      console.log('[SCROLL DIAG] -> calling loadMore()')
       loadMore()
+      console.log('[SCROLL DIAG] -> after loadMore, visibleCount =', visibleCount.value,
+        '| rendered =', visibleAlbums.value.length)
     }
   }, { rootMargin: '200px' })
   observer.observe(scrollTrigger.value)
+  console.log('[SCROLL DIAG] observer.observe() done for', scrollTrigger.value)
 }
 
 const teardownObserver = () => {
@@ -577,6 +595,7 @@ watch(selectedYear, () => {
 
 // Lifecycle
 onMounted(() => {
+  console.log('[SCROLL DIAG] Albums onMounted — loading =', loading.value, '| error =', error.value)
   loadAlbums()
   setupObserver()
 })
