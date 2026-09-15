@@ -342,32 +342,20 @@ const loadMore = () => {
 const scrollTrigger = ref(null)
 let observer = null
 
+// Attaches the observer to the sentinel. Must only be called once the sentinel is
+// actually visible: an element with `display: none` has zero geometry, so an
+// observer attached at that moment records isIntersecting = false and is never
+// re-evaluated when `display` later flips — IntersectionObserver only re-checks on
+// scroll, resize, or a layout change inside a tracked root, not on a style change.
 const setupObserver = () => {
-  console.log('[SCROLL DIAG] setupObserver called, sentinel =', scrollTrigger.value)
-  if (!scrollTrigger.value) {
-    console.warn('[SCROLL DIAG] sentinel is NULL — observer not attached')
-    return
-  }
-  console.log('[SCROLL DIAG] at setup: sortedAlbums.length =', sortedAlbums.value.length,
-    '| visibleCount =', visibleCount.value,
-    '| hasMore =', hasMoreAlbums.value)
+  teardownObserver()
+  if (!scrollTrigger.value) return
   observer = new IntersectionObserver((entries) => {
-    console.log('[SCROLL DIAG] observer fired: isIntersecting =', entries[0].isIntersecting,
-      '| ratio =', entries[0].intersectionRatio,
-      '| hasMore =', hasMoreAlbums.value,
-      '| isLoadingMore =', isLoadingMore.value,
-      '| visibleCount =', visibleCount.value,
-      '| rootBounds =', entries[0].rootBounds ? 'set' : 'null',
-      '| boundingClientRect.top =', entries[0].boundingClientRect?.top)
     if (entries[0].isIntersecting && hasMoreAlbums.value && !isLoadingMore.value) {
-      console.log('[SCROLL DIAG] -> calling loadMore()')
       loadMore()
-      console.log('[SCROLL DIAG] -> after loadMore, visibleCount =', visibleCount.value,
-        '| rendered =', visibleAlbums.value.length)
     }
   }, { rootMargin: '200px' })
   observer.observe(scrollTrigger.value)
-  console.log('[SCROLL DIAG] observer.observe() done for', scrollTrigger.value)
 }
 
 const teardownObserver = () => {
@@ -595,8 +583,16 @@ watch(selectedYear, () => {
 
 // Lifecycle
 onMounted(() => {
-  console.log('[SCROLL DIAG] Albums onMounted — loading =', loading.value, '| error =', error.value)
   loadAlbums()
+})
+
+// The sentinel is `v-show`-hidden until `hasMoreAlbums` is true, and on first paint
+// `sortedAlbums` is empty (the fetch has not resolved), so an observer attached from
+// onMounted would only ever bind to a `display: none` node and never fire again.
+// Re-attaching once the data lands — after nextTick, so v-show has flushed `display`
+// to the DOM — is what makes the sentinel observable at all.
+watch([loading, hasMoreAlbums], async () => {
+  await nextTick()
   setupObserver()
 })
 
