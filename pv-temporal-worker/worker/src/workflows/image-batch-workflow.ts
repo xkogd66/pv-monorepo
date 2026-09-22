@@ -3,10 +3,13 @@ import type * as convertDeps from '../activities/convertImage';
 import type * as metadataDeps from '../activities/metadataActivity';
 import type * as persistDeps from '../activities/cleanup';
 import type * as reportDeps from '../activities/reportProgress';
+import type * as oneDriveDeps from '../activities/downloadFromOneDrive';
+import type * as videoDeps from '../activities/uploadVideo';
 
-type AllActivities = typeof convertDeps & typeof metadataDeps & typeof persistDeps & typeof reportDeps;
+type AllActivities = typeof convertDeps & typeof metadataDeps & typeof persistDeps & typeof reportDeps &
+  typeof oneDriveDeps & typeof videoDeps;
 
-const { convertImage, extractAndPersistMetadata, cleanupBatch } =
+const { convertImage, extractAndPersistMetadata, cleanupBatch, downloadFromOneDrive, uploadVideoToMinIO } =
   proxyActivities<AllActivities>({
     startToCloseTimeout: '60 minutes',
     retry: { maximumAttempts: 5 },
@@ -23,6 +26,8 @@ export interface ImageFile {
   filename: string;
   path: string;
   contentType: string;
+  // OneDrive import only: rclone source, downloaded to `path` before processing
+  remote?: string;
 }
 
 export interface BatchInput {
@@ -112,14 +117,19 @@ export async function processBatchImages(input: BatchInput): Promise<BatchResult
   > = [];
 
   for (const image of images) {
-    const objectName = predictObjectName(albumName, image.filename);
+    // Videos only arrive via OneDrive import; they skip metadata/conversion
+    // and are stored as-is, like POST /video/upload.
+    const isVideo = image.contentType.startsWith('video/');
+    const objectName = isVideo ? `${albumName}/${image.filename}` : predictObjectName(albumName, image.filename);
 
     log.info('image: dispatching activities', { batchId, filename: image.filename, objectName });
 
     // Run metadata first, then conversion. Conversion must not start if metadata fails.
+    // A OneDrive download failure lands here too, so the file is counted as failed.
     let metadataResult: any;
     try {
-      const meta = await extractAndPersistMetadata(image.path, image.filename, objectName);
+      if (image.remote) await downloadFromOneDrive(image.remote, image.path);
+      const meta = isVideo ? null : await extractAndPersistMetadata(image.path, image.filename, objectName);
       metadataResult = { status: 'fulfilled', value: meta };
     } catch (err) {
       metadataResult = { status: 'rejected', reason: err };
@@ -131,7 +141,13 @@ export async function processBatchImages(input: BatchInput): Promise<BatchResult
       conversionResult = { status: 'rejected', reason: new Error(`Metadata failed: ${String(metadataResult.reason)}`) };
     } else {
       try {
-        const conv = await convertImage(image, objectName);
+        const conv = isVideo
+          ? await uploadVideoToMinIO({
+              batchId,
+              folder: albumName,
+              videos: [{ filename: image.filename, path: image.path, contentType: image.contentType, objectName }],
+            })
+          : await convertImage(image, objectName);
         conversionResult = { status: 'fulfilled', value: conv };
       } catch (err) {
         conversionResult = { status: 'rejected', reason: err };
@@ -205,7 +221,8 @@ export async function processBatchImages(input: BatchInput): Promise<BatchResult
         ? Math.round((progressState.processed / progressState.totalRequested) * 100)
         : 0;
     progressState.updatedAt = new Date().toISOString();
-    progressState.lastSuccessFile = image.filename;
+    // lastSuccessFile becomes the album cover (<base>.webp); videos have no thumbnail.
+    if (!isVideo) progressState.lastSuccessFile = image.filename;
     progressState.message = `Processing images (${progressState.processed} of ${progressState.totalRequested} done)`;
 
     try {

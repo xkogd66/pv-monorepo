@@ -12,3 +12,4 @@ data:
   MINIO_PORT: "9000"
   MINIO_USE_SSL: "false"
   MINIO_BUCKET_NAME: "photovault"
+  RCLONE_CONFIG: "/nfs-storage/.rclone/rclone.conf"

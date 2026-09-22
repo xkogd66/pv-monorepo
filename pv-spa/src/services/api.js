@@ -164,6 +164,19 @@ async request(endpoint, options = {}) {
     });
   }
 
+  // OneDrive import: subfolders of photo-albums/<path>
+  async listOneDriveFolders(path = '') {
+    return this.request(`/onedrive/folders?path=${encodeURIComponent(path)}`);
+  }
+
+  // OneDrive import into an existing album (202 Accepted + batchId, bulk workflow)
+  async importFromOneDrive(path, albumName) {
+    return this.request('/onedrive/import', {
+      method: 'POST',
+      body: JSON.stringify({ path, albumName }),
+    });
+  }
+
   // Temporal bulk image upload (202 Accepted + batchId)
   async uploadBulkToTemporal(folder, files) {
     const formData = new FormData();

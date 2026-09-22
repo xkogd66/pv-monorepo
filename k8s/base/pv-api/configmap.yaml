@@ -37,3 +37,6 @@ data:
   # NFS Storage Path
   # This must match the mountPath in your Deployment's volumeMounts
   NFS_PATH: "/nfs-storage"
+
+  # rclone config for OneDrive import (on NFS: rclone rewrites it on token refresh)
+  RCLONE_CONFIG: "/nfs-storage/.rclone/rclone.conf"

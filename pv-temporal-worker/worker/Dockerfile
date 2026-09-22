@@ -14,6 +14,9 @@ RUN apt-get update && apt-get install -y \
 	ca-certificates \
 	&& rm -rf /var/lib/apt/lists/*
 
+# rclone (OneDrive import) — static binary from the official image
+COPY --from=rclone/rclone:1.71.1 /usr/local/bin/rclone /usr/local/bin/rclone
+
 # Copy package files
 COPY --chown=node:node package*.json ./
 

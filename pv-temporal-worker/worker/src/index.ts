@@ -7,6 +7,7 @@ import * as metadataActivities from './activities/metadataActivity';
 import * as persistActivities from './activities/cleanup'; // cleanupBatch activity
 import * as reportActivities from './activities/reportProgress';
 import * as videoActivities from './activities/uploadVideo';
+import * as oneDriveActivities from './activities/downloadFromOneDrive';
 
 // 1. Start Health Server Immediately
 // Binding to '0.0.0.0' is mandatory for Kubernetes probes to connect
@@ -58,6 +59,7 @@ async function run() {
       ...persistActivities,
       ...reportActivities,
       ...videoActivities,
+      ...oneDriveActivities,
     },
   });
 

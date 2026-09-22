@@ -182,6 +182,8 @@ Non-sensitive vars live in ConfigMaps per service under `k8s/base/<service>/conf
 | GET | `/objects/:name` | List photos in an album (presigned URLs); 404 for anonymous callers on a private album |
 | POST | `/bulk/upload/:folder` | Image upload → Temporal workflow (returns 202 + batchId) |
 | POST | `/video/upload/:folder` | Video upload → Temporal workflow (returns 202 + batchId) |
+| GET | `/onedrive/folders?path=` | List subfolders of `onedrive:photo-albums/<path>` via rclone (admin) |
+| POST | `/onedrive/import` | `{ path, albumName }` → start OneDrive import into an existing album (admin; 202 + batchId) |
 | GET | `/bulk/status/:workflowId` | Poll bulk workflow status |
 | GET | `/bulk/progress/:workflowId` | Poll bulk workflow progress |
 | POST | `/bulk/progress` | Progress callback from the worker |
@@ -200,6 +202,88 @@ Non-sensitive vars live in ConfigMaps per service under `k8s/base/<service>/conf
 5. Worker POSTs progress to `/bulk/progress`; the SPA polls `GET /bulk/progress/:workflowId`
 
 Videos follow the same shape via `POST /video/upload/:folder` → `processVideoUpload`.
+
+---
+
+## OneDrive Import (rclone)
+
+Pulls one OneDrive folder into a new library album. Written 2026-09-22; **not yet
+built, deployed or exercised end to end** against the cluster.
+
+**Why rclone, not Microsoft Graph:** Graph needs an Azure app registration, an OAuth
+flow in pv-api and a token table. rclone ships its own client ID, handles token
+refresh, streaming and throttling, and the owner already used it. Chosen as the
+simplest option; see the costs below.
+
+**Flow**
+
+```
+Albums.vue toolbar (cloud-download icon, admin) → OneDriveImportDialog.vue
+  │ browse: GET /onedrive/folders?path=2023     (rclone lsjson --dirs-only)
+  │ 1. POST /album/:name   (existing create; private by default; 409 if taken)
+  │ 2. POST /onedrive/import { path, albumName }
+  │        pv-api: rclone lsjson --files-only → filter → start processBatchImages
+  │        workflowId batch-<batchId>, each file carries `remote`
+  └ registerBulkUpload() → same progress polling / Monitor page as bulk upload
+
+pv-temporal-worker, processBatchImages, per file:
+  downloadFromOneDrive (rclone copyto → /nfs-storage/<batchId>/<name>)
+  ├ JPEG/HEIC → extractAndPersistMetadata → convertImage   (unchanged path)
+  └ video     → uploadVideoToMinIO (stored as-is at <album>/<name>)
+```
+
+It deliberately reuses `processBatchImages` and the `batch-` workflow-id prefix, so
+`/bulk/progress`, `/bulk/jobs`, the Monitor page, `albums.counter` and the album cover
+all work with no changes. Uploads that don't come from OneDrive have no `remote` and no
+videos, so they run the same activity sequence as before (safe for in-flight workflows).
+
+**Files**
+- `pv-api/src/routes/onedrive.js` — both routes; `ROOT = "onedrive:photo-albums"`.
+- `pv-temporal-worker/worker/src/activities/downloadFromOneDrive.ts` — one `rclone copyto` per file.
+- `pv-temporal-worker/worker/src/workflows/image-batch-workflow.ts` — `remote` download + video routing.
+- `pv-spa/src/components/OneDriveImportDialog.vue` — folder browser + import form.
+- `pv-api/Dockerfile`, `pv-temporal-worker/worker/Dockerfile` — `COPY --from=rclone/rclone:1.71.1`
+  (pv-api also copies the CA bundle; the slim Node image may lack one).
+- `RCLONE_CONFIG` in both ConfigMaps.
+
+**Rules**
+- Only `image/jpeg`, `image/heic` (pv-converter's accepted types) and videos matching the
+  `AlbumViewer.vue` extension regex are imported. Other files are left on OneDrive and
+  never counted. OneDrive is read-only from pv's side: nothing is moved or deleted there.
+- One folder per import, no recursion into subfolders.
+- The dialog pre-fills from the folder: `2023/(02) solna` → name `solna`, month 2, year 2023.
+  Anything else (`M`, `london 91-92`) just uses the folder name. All fields are editable.
+- Each download is its own Temporal activity (retried), streamed to NFS — the file is
+  never held in worker memory, so the 1 GiB limit doesn't apply to large videos.
+
+**rclone config**
+- Lives on NFS at `/mnt/storage/slask/pv/.rclone/rclone.conf` on mjolnir, which the pods
+  see as `/nfs-storage/.rclone/rclone.conf`. Remote name: `onedrive` (personal drive).
+- It must be writable: rclone rewrites the refresh token on every refresh, so a read-only
+  Secret mount would go stale. Owner is `65534:65534` (`nobody`; the NFS export squashes
+  clients to it), mode `600`.
+- This is a dedicated config for the photo-library OneDrive account only — not the owner's
+  other rclone config. `~/pv-rclone.conf` on mjolnir is a stale backup; don't use it.
+- **If the token dies** (import fails with an rclone auth error), on mjolnir:
+  ```bash
+  sudo rclone --config /mnt/storage/slask/pv/.rclone/rclone.conf config reconnect onedrive:
+  sudo chown 65534:65534 /mnt/storage/slask/pv/.rclone/rclone.conf
+  ```
+  Sign in with the live.com account that holds the photos.
+- Never paste the config contents anywhere; it holds a token with read access to the whole drive.
+
+**Known costs and gaps**
+- If the import fails to start after the album was created (e.g. rclone error), an empty
+  album is left behind and a retry gets 409 until it's deleted.
+- JPEG/HEIC over 15 MB fail at pv-converter's existing input limit and count as failed.
+- In an import, videos count toward progress and `albums.counter`. Plain
+  `POST /video/upload` still doesn't increment the counter.
+- Videos never become the cover (`lastSuccessFile` is only set for images).
+- Same-name folders in one year (`(06) cph`, `(11) cph`) collide: the second gets 409 —
+  rename it in the dialog.
+- The token sits in plain text on NFS; anyone with root on mjolnir or access to the export can read it.
+- rclone's shared client ID is throttled harder by Microsoft than a private one would be.
+- No "OneDrive not connected" UI — a dead token just shows rclone's error in the dialog.
 
 ---
 
@@ -527,10 +611,32 @@ works because no ancestor sets `overflow` (`#app` and `body` are clean); the onl
 `Math.ceil(len / 24)` page window with prev/next buttons). `visibleAlbums` is a
 `slice(0, visibleCount)` of `sortedAlbums` — a window that only grows — and a sentinel
 `<div ref="scrollTrigger">` at the end of the grid drives `loadMore()` through an
-`IntersectionObserver` (`rootMargin: '200px'`). The sentinel uses `v-show`, not `v-if`:
-`v-if` would destroy and recreate the element per batch and break the observer's DOM
-reference. All albums are still fetched in the one `GET /albums` call, so growing the
-window never hits the network. There is deliberately **no** "Showing X of Y" footer.
+`IntersectionObserver` (`rootMargin: '200px'`). All albums are still fetched in the one
+`GET /albums` call, so growing the window never hits the network. There is deliberately
+**no** "Showing X of Y" footer.
+
+Two constraints on the sentinel, and the second one is the one that actually bit:
+
+1. It uses `v-show`, not `v-if` — `v-if` would destroy and recreate the element per
+   batch and break the observer's DOM reference. (`v-show` does not, however, protect
+   against an *ancestor* `v-if` unmounting the sentinel.)
+2. **The observer must be attached after the data lands, not from `onMounted`.** On
+   first paint `sortedAlbums` is empty (the fetch has not resolved), so `hasMoreAlbums`
+   is false and the `v-show` sentinel is `display: none`. A `display: none` element has
+   **zero geometry** — an observer attached then records `isIntersecting = false`
+   forever, because `IntersectionObserver` re-evaluates on scroll, resize, or a layout
+   change inside a tracked root, **not** on a style change. When the albums arrived and
+   the sentinel became visible, nothing re-fired and the grid stuck at the first 24.
+   The symptom is silent: no console error, and it reproduces identically on every
+   engine, which makes it look like an `IntersectionObserver` support problem when it
+   is not.
+
+`Albums.vue` therefore re-attaches from `watch([loading, hasMoreAlbums])` behind
+`await nextTick()` — the `nextTick` is load-bearing, since without it the observer binds
+before `v-show` has flushed `display` to the DOM and the same bug returns. That watcher
+also covers refresh, error-retry and create/edit/delete (all flip `loading`), plus the
+year filter dropping the count below the window and back above it. `setupObserver()`
+calls `teardownObserver()` first so a re-attach cannot leak a second observer.
 
 Tradeoffs of dropping the page buttons: there is no longer any position indicator and no
 way to jump to the end, and the DOM grows unbounded as batches append (acceptable at

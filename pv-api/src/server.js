@@ -124,6 +124,7 @@ const albumRoutes = require("./routes/albums");
 const statRoutes = require("./routes/stats");
 const temporalRoutes = require("./routes/temporalUploads"); // Added this for the new Temporal route
 const videoUploadRoutes = require("./routes/videoUpload");
+const oneDriveRoutes = require("./routes/onedrive");
 
 // Bulk-upload progress store (written by the worker via POST /bulk/progress)
 const { persistProgress, getProgress } = require("./services/sse-service");
@@ -154,6 +155,7 @@ async function startServer() {
     app.use("/", statRoutes(minioClient));
     app.use("/bulk", temporalRoutes(getTemporalClient, config, { persistProgress, getProgress }));
     app.use("/video", videoUploadRoutes(minioClient, { getTemporalClient }));
+    app.use("/onedrive", oneDriveRoutes(getTemporalClient, config));
     app.use("/", healthRoutes(minioClient, temporalClient));
 
     // Listen BEFORE probing dependencies. The probe is informational — it only

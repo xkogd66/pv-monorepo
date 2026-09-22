@@ -46,6 +46,11 @@
           <i class="fas fa-sync-alt" :class="{ 'fa-spin': loading }"></i>
         </button>
 
+        <button v-if="canCreateAlbum" @click="showOneDriveDialog = true" title="Import from OneDrive"
+          class="flex-none w-11 h-11 sm:w-[34px] sm:h-[34px] flex items-center justify-center border border-gray-200 rounded-lg sm:rounded-md bg-white text-gray-600 text-[13px] transition hover:bg-gray-50">
+          <i class="fas fa-cloud-download-alt"></i>
+        </button>
+
         <button v-if="canCreateAlbum" @click="showCreateDialog = true"
           class="hidden sm:flex items-center h-[34px] px-3.5 bg-emerald-600 text-white rounded-md text-[13px] font-semibold transition hover:bg-emerald-700 whitespace-nowrap">
           <i class="fas fa-plus mr-1.5"></i>New album
@@ -122,7 +127,13 @@
       :visible="showCreateDialog" 
       :creating="creating" 
       @create="handleCreateAlbum" 
-      @close="closeCreateDialog" 
+      @close="closeCreateDialog"
+    />
+
+    <OneDriveImportDialog
+      :visible="showOneDriveDialog"
+      @imported="loadAlbums"
+      @close="showOneDriveDialog = false"
     />
 
     <!-- Delete Confirmation Dialog -->
@@ -216,6 +227,7 @@ import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
 import apiService from '../services/api.js'
 import authService from '../services/auth.js'
 import CreateAlbumDialog from './CreateAlbumDialog.vue'
+import OneDriveImportDialog from './OneDriveImportDialog.vue'
 import AlbumCard from './AlbumCard.vue'
 
 // Emits
@@ -226,6 +238,7 @@ const loading = ref(false)
 const error = ref(null)
 const albums = ref([])
 const showCreateDialog = ref(false)
+const showOneDriveDialog = ref(false)
 const showDeleteDialog = ref(false)
 const showEditDialog = ref(false)
 const editAlbumName = ref('')
