@@ -251,6 +251,9 @@ videos, so they run the same activity sequence as before (safe for in-flight wor
   `AlbumViewer.vue` extension regex are imported. Other files are left on OneDrive and
   never counted. OneDrive is read-only from pv's side: nothing is moved or deleted there.
 - One folder per import, no recursion into subfolders.
+- `GET /onedrive/folders` results are cached in pv-api memory for the pod's lifetime
+  (the OneDrive tree is frozen — nothing new is uploaded there). Restart pv-api to see
+  a changed tree. The file list at import time is always read fresh.
 - The dialog pre-fills from the folder: `2023/(02) solna` → name `solna`, month 2, year 2023.
   Anything else (`M`, `london 91-92`) just uses the folder name. All fields are editable.
 - Each download is its own Temporal activity (retried), streamed to NFS — the file is

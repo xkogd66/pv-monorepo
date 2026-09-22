@@ -26,12 +26,20 @@ const lsjson = async (relPath, flag) => {
   return JSON.parse(stdout);
 };
 
+// ponytail: folder tree is frozen (nothing new goes to OneDrive), so listings are
+// cached for the pod's lifetime; restart pv-api if the tree ever changes.
+const folderCache = new Map();
+
 module.exports = (getTemporalClient, config) => {
   // GET /onedrive/folders?path=2023 — subfolders of photo-albums/<path>
   router.get("/folders", authenticateToken, requireRole("admin"), async (req, res) => {
+    const relPath = req.query.path || "";
     try {
-      const entries = await lsjson(req.query.path || "", "--dirs-only");
-      res.json({ folders: entries.map((e) => e.Name).sort() });
+      if (!folderCache.has(relPath)) {
+        const entries = await lsjson(relPath, "--dirs-only");
+        folderCache.set(relPath, entries.map((e) => e.Name).sort());
+      }
+      res.json({ folders: folderCache.get(relPath) });
     } catch (err) {
       debugOneDrive(`list folders failed: ${err.stderr || err.message}`);
       res.status(502).json({ error: "OneDrive listing failed", message: err.stderr || err.message });
