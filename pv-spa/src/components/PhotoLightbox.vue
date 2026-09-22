@@ -9,7 +9,12 @@
 
       <!-- Photo Display -->
       <div class="flex flex-col max-w-[95vw] max-h-[95vh] w-full h-full items-center justify-center">
-        <div class="flex-1 flex items-center justify-center relative w-full min-h-0" style="height: calc(100% - 80px);">
+        <div
+          class="flex-1 flex items-center justify-center relative w-full min-h-0"
+          style="height: calc(100% - 80px);"
+          @touchstart.passive="handleTouchStart"
+          @touchend="handleTouchEnd"
+        >
           
           <img 
             v-if="currentPhoto" 
@@ -222,6 +227,27 @@ const previousPhoto = () => {
   if (props.currentIndex > 0) {
     emit('previous-photo')
   }
+}
+
+// Swipe left/right on the photo to navigate (touch devices only — mice don't fire touch events)
+let touchStart = null
+
+const handleTouchStart = (event) => {
+  // Ignore multi-finger gestures so pinch-zoom doesn't turn into a page flip
+  touchStart = event.touches.length === 1
+    ? { x: event.touches[0].clientX, y: event.touches[0].clientY }
+    : null
+}
+
+const handleTouchEnd = (event) => {
+  if (!touchStart) return
+  const dx = event.changedTouches[0].clientX - touchStart.x
+  const dy = event.changedTouches[0].clientY - touchStart.y
+  touchStart = null
+  // Must be a mostly-horizontal swipe of at least 50px
+  if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return
+  if (dx < 0) nextPhoto()
+  else previousPhoto()
 }
 
 const handleKeyboard = (event) => {
