@@ -5,6 +5,7 @@ const { authenticateToken, authenticateOptional, requireRole } = require("../mid
 
 const database = require("../services/database-service");
 const { getAddressFromCoordinates } = require("../services/metadata-service");
+const { recountAlbum } = require("../services/album-counter");
 
 const config = require("../config");
 
@@ -478,8 +479,8 @@ const deleteObjects = (minioClient) => async (req, res) => {
     const thumbPath = `${folderPath}/thumbs/${thumbName}`;
     minioClient.removeObject(config.minio.bucketName, thumbPath).catch(() => {});
 
-    // Decrement album file counter
-    database.incrementFileCounter(-1, folderPath).catch(() => {});
+    // Recount the album rather than decrementing, so the counter self-heals
+    recountAlbum(folderPath).catch(() => {});
 
     res.status(200).json({
       success: true,

@@ -423,10 +423,12 @@ class Database {
     }
   }
 
-  async incrementFileCounter(increment, albumName) {
-    let updateQuery = " UPDATE albums SET counter = counter + ? WHERE name = ?";
-    const params = [increment, albumName];
-  
+  // Set, never add: the caller recounts MinIO, so this is idempotent and a
+  // repeated or retried write converges on the same number instead of drifting.
+  async setFileCounter(count, albumName) {
+    let updateQuery = " UPDATE albums SET counter = ? WHERE name = ?";
+    const params = [count, albumName];
+
 
     const connection = await this.pool.getConnection();
     try {

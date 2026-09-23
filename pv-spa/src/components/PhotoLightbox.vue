@@ -39,7 +39,7 @@
             <button
               @click.stop="previousPhoto"
               :disabled="currentIndex === 0"
-              class="bg-white bg-opacity-10 text-white w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 backdrop-blur-sm hover:bg-opacity-20 hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed"
+              class="bg-white bg-opacity-10 text-white w-9 h-9 rounded-full hidden md:flex items-center justify-center transition-all duration-200 backdrop-blur-sm hover:bg-opacity-20 hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed"
               title="Previous Photo (←)"
             >
               <i class="fas fa-chevron-left text-sm"></i>
@@ -50,7 +50,7 @@
             <button
               @click.stop="nextPhoto"
               :disabled="currentIndex === photos.length - 1"
-              class="bg-white bg-opacity-10 text-white w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 backdrop-blur-sm hover:bg-opacity-20 hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed"
+              class="bg-white bg-opacity-10 text-white w-9 h-9 rounded-full hidden md:flex items-center justify-center transition-all duration-200 backdrop-blur-sm hover:bg-opacity-20 hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed"
               title="Next Photo (→)"
             >
               <i class="fas fa-chevron-right text-sm"></i>

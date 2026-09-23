@@ -6,6 +6,7 @@ const debugTemporal = debug("pv:server:temporal");
 const debugBulkApi = debug("pv:server:bulk");
 
 const database = require("../services/database-service");
+const { recountAlbum } = require("../services/album-counter");
 
 const multer = require("multer");
 const { randomUUID } = require("crypto");
@@ -125,9 +126,11 @@ module.exports = (getTemporalClient, config, { persistProgress, getProgress } = 
                 persistProgress(jobId, { progress: body });
             }
 
-            // When the batch completes, credit the successful count to the album counter
+            // When the batch completes, recount the album from MinIO. Not `+= successful`:
+            // a re-upload overwrites objects without adding any, and this POST can arrive
+            // more than once (the activity retries), so adding would drift the counter.
             if (body.state === 'complete' && body.albumName && body.successful > 0) {
-                database.incrementFileCounter(body.successful, body.albumName).catch((err) => {
+                recountAlbum(body.albumName).catch((err) => {
                     debugBulkApi('[internal/progress] Failed to update album counter:', err.message);
                 });
 
