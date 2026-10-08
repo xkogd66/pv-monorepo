@@ -47,6 +47,10 @@
           class="bg-gray-100 text-gray-800 border border-gray-300 px-4 py-2 min-h-[44px] rounded-md text-sm hover:bg-gray-200">
           {{ started ? 'Close' : 'Cancel' }}
         </button>
+        <button v-if="started" @click="$emit('monitor')"
+          class="bg-emerald-500 text-white px-4 py-2 min-h-[44px] rounded-md text-sm font-semibold hover:bg-emerald-600">
+          Go to Monitor
+        </button>
         <button v-if="!started" @click="startImport" :disabled="!segments.length || !albumName.trim() || importing"
           class="bg-emerald-500 text-white px-4 py-2 min-h-[44px] rounded-md text-sm font-semibold hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed">
           {{ importing ? 'Starting...' : 'Import this folder' }}
@@ -62,7 +66,7 @@ import apiService from '../services/api.js'
 import { useUploadMonitor } from '../services/uploadMonitor.js'
 
 const props = defineProps({ visible: { type: Boolean, default: false } })
-const emit = defineEmits(['close', 'imported'])
+const emit = defineEmits(['close', 'imported', 'monitor'])
 const { registerBulkUpload } = useUploadMonitor()
 
 const segments = ref([])

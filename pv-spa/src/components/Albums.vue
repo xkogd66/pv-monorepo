@@ -133,6 +133,7 @@
     <OneDriveImportDialog
       :visible="showOneDriveDialog"
       @imported="loadAlbums"
+      @monitor="showOneDriveDialog = false; emit('navigate', 'bulk-jobs')"
       @close="showOneDriveDialog = false"
     />
 
@@ -222,8 +223,16 @@
   </div>
 </template>
 
+<script>
+import { ref } from 'vue'
+// Module scope: App.vue unmounts Albums when an album is opened, so component-local
+// refs would reset the filter/sort on every return. Lives until a full page reload.
+const sortOrder = ref('year-desc')
+const selectedYear = ref(null)
+</script>
+
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
+import { onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
 import apiService from '../services/api.js'
 import authService from '../services/auth.js'
 import CreateAlbumDialog from './CreateAlbumDialog.vue'
@@ -252,8 +261,6 @@ const saving = ref(false)
 const albumToDelete = ref(null)
 const albumToEdit = ref(null)
 const editAlbumNameInput = ref(null)
-const sortOrder = ref('year-desc')
-const selectedYear = ref(null)
 
 // Infinite scroll: how many albums of `sortedAlbums` are currently rendered.
 // The full album list is fetched once (see loadAlbums) — growing this number is
