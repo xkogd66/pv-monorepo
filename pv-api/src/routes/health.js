@@ -136,8 +136,10 @@ async function checkAllDependencies(minioClient, temporalClient) {
 
 const dependencyStatus = require("../services/dependency-status");
 
-const healthCheck = (minioClient, temporalClient) => async (req, res) => {
-  const results = await checkAllDependencies(minioClient, temporalClient);
+// getTemporalClient is a getter, not a client: the client may be (re)created by
+// the reconnect loop after this route is registered.
+const healthCheck = (minioClient, getTemporalClient) => async (req, res) => {
+  const results = await checkAllDependencies(minioClient, getTemporalClient());
 
   // "Ready" only when every dependency is healthy
   const isReady =
@@ -165,9 +167,9 @@ const healthCheck = (minioClient, temporalClient) => async (req, res) => {
   });
 };
 
-module.exports = (minioClient, temporalClient) => {
+module.exports = (minioClient, getTemporalClient) => {
   const router = express.Router();
-  router.get("/health", healthCheck(minioClient, temporalClient));
+  router.get("/health", healthCheck(minioClient, getTemporalClient));
   return router;
 };
 

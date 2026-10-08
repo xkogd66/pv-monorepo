@@ -156,7 +156,7 @@ async function startServer() {
     app.use("/bulk", temporalRoutes(getTemporalClient, config, { persistProgress, getProgress }));
     app.use("/video", videoUploadRoutes(minioClient, { getTemporalClient }));
     app.use("/onedrive", oneDriveRoutes(getTemporalClient, config));
-    app.use("/", healthRoutes(minioClient, temporalClient));
+    app.use("/", healthRoutes(minioClient, getTemporalClient));
 
     // Listen BEFORE probing dependencies. The probe is informational — it only
     // populates `startupDependencies` in the /health payload — but the converter
