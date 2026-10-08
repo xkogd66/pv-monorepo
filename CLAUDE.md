@@ -12,6 +12,12 @@ Never run `kubectl` (or any other command that reads/touches the live K3s cluste
 
 ---
 
+## File Deletion
+
+Never run `rm`, `git rm`, `rm -rf`, or any other command that deletes files or directories yourself — no exceptions, even for files that look obviously safe (build artifacts, a directory being deprecated, scratch files you created). Instead, tell the user exactly what needs to be deleted and why, and ask them to delete it themselves (or give explicit go-ahead for you to run the exact command).
+
+---
+
 ## Visual Verification
 
 Do not attempt to visually verify UI changes yourself (screenshots, headless browser driving, etc.), and do not run build or dev-server commands (`npm run build`, `npm run dev`, `vite build`, etc.) to self-verify either. Make the code change, then explicitly ask the user to build/run/check it themselves (dev server or real environment). Do not claim a UI change "looks correct" or "works" based on your own screenshot or build output — you cannot see, and simulated verification is not a substitute for a human actually checking it.
@@ -50,13 +56,12 @@ Still required: the Explain Reasoning rule above, blockers, destructive-action w
 | `pv-converter/` | AVIF image conversion service | Python 3.11 / FastAPI |
 | `pv-metadata/` | EXIF extraction + album index writer (MinIO) | Python 3.11 / FastAPI |
 | `pv-temporal-worker/` | Async batch processing worker | TypeScript / Temporal SDK |
-| `pv_bulk_upload/` | CLI bulk upload tool — **currently broken**, see below | Node.js |
 | `k8s/` | Kubernetes manifests | YAML (base configs per service) |
 | `tools/` | Utility scripts | — |
 
-`pv_bulk_upload` targets `POST /buckets/:bucket/upload` and the `/processing-status/:jobId`
-SSE stream, both of which were removed with the legacy upload path. It needs to be
-repointed at `POST /bulk/upload/:folder` or deleted.
+`pv_bulk_upload` (CLI bulk upload tool) was deprecated and removed — it targeted
+`POST /buckets/:bucket/upload` and the `/processing-status/:jobId` SSE stream, both
+removed with the legacy upload path. If ever needed again, recover it from git history.
 
 ---
 

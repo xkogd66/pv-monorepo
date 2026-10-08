@@ -15,7 +15,6 @@
 | **`pv-temporal-worker/`** | TypeScript / Temporal SDK | Async orchestration — runs Temporal workflows & activities |
 | **`pv-converter/`** | Python 3.11 / FastAPI | AVIF conversion (via `avifenc`/`heif-enc` binaries) + WebP thumbnail generation; writes directly to MinIO |
 | **`pv-metadata/`** | Python 3.11 / FastAPI | EXIF extraction, reverse geocoding (Mapbox), album index JSON writer; writes directly to MinIO |
-| **`pv_bulk_upload/`** | Node.js CLI | **Legacy/broken** — points at removed endpoints; needs repointing or deletion (per CLAUDE.md) |
 | **`k8s/`** | YAML | Consolidated per-service manifests (namespace `pv`) |
 | Backing services | — | MinIO (S3), MariaDB, Temporal server, NFS mount |
 
@@ -31,24 +30,24 @@ and EXIF parsing.
 
 ```
 ┌─────────┐   HTTPS    ┌───────────┐        ┌──────────────┐
-│ Browser │ ────────► │  pv-api   │ ─────► │   Temporal   │
-│ (pv-spa)│ ◄──────── │ (Express) │  gRPC  │    server    │
-└─────────┘   poll    └─────┬─────┘        └──────┬───────┘
-       ▲                    │ 1. stage to NFS     │
-       │                    │ 2. return 202       ▼
-       │                ┌───┴───┐        ┌─────────────────┐
-       │                │  NFS  │ ◄───── │ pv-temporal-    │
-       │                └───────┘        │ worker (1 conc) │
-       │                                 └──┬────┬────┬────┘
-       │      POST /bulk/progress           │    │    │
-       │ ◄──────────────────────────────────┘    │    │
-       │                                         ▼    ▼
-       │                        ┌────────────┐ ┌──────────┐
-       │                        │ pv-converter│ │ pv-metadata│
-       │                        │ (AVIF+thumb)│ │ (EXIF+geo) │
-       │                        └─────┬──────┘ └────┬─────┘
-       │                              │   write     │ write
-       │                              ▼             ▼
+│ Browser │ ────────►  │  pv-api   │ ─────► │   Temporal   │
+│ (pv-spa)│ ◄────────  │ (Express) │  gRPC  │    server    │
+└─────────┘   poll     └─────┬─────┘        └──────┬───────┘
+       ▲                     │ 1. stage to NFS     │
+       │                     │ 2. return 202       ▼
+       │                 ┌───┴───┐        ┌─────────────────┐
+       │                 │  NFS  │ ◄───── │ pv-temporal-    │
+       │                 └───────┘        │ worker (1 conc) │
+       │                                  └──┬────┬────┬────┘
+       │      POST /bulk/progress            │    │    │
+       │  ◄──────────────────────────────────┘    │    │
+       │                                          ▼    ▼
+       │                        ┌──────────────┐ ┌────────────┐
+       │                        │ pv-converter │ │ pv-metadata│
+       │                        │ (AVIF+thumb) │ │ (EXIF+geo) │
+       │                        └─────┬────────┘ └────┬───────┘
+       │                              │   write       │ write
+       │                              ▼               ▼
        │                          ┌────────────────────┐
        │                          │   MinIO (S3)       │
        │  ── presigned URLs ────► │  bucket photovault │
@@ -142,20 +141,20 @@ from NFS to MinIO → cleanup. No transcoding, no metadata.
 
 ```
                    ┌──────────────────────────────────────────────┐
-                   │           LAN 192.168.1.0/24                │
+                   │           LAN 192.168.1.0/24                 │
                    │                                              │
-   ┌────────────┐  │  ┌──────────────────────────────────────┐   │
-   │   mjolnir  │  │  │  K3s cluster (k3s, namespace `pv`)   │   │
-   │   .8       │◄─┼──┤  control-plane: k3sm-pi .15 (Pi, etcd)│  │
-   │ Ubuntu 26.04│ │  │  workers:                              │  │
-   │  ─ MinIO   │  │  │    k3sa.hugin .120   k3sa.frigg .123  │   │
-   │    :9000   │  │  │    k3sa.hela  .121*  k3sa.munin .125  │   │
-   │  ─ MariaDB │  │  │    k3sa.freki .122   k3sa.idunn .126  │   │
-   │    :3306   │  │  │    k3sa.wahl  .124   k3sa.wikke .127  │   │
-   │  ─ NFS     │  │  │    thinkpad  .44                      │   │
-   │    /nfs-storage┘  │    *hela NotReady/SchedulingDisabled │   │
-   └────────────┘      └──────────────────────────────────────┘   │
-                       └──────────────────────────────────────────┘
+   ┌────────────┐  │  ┌──────────────────────────────────────┐    │
+   │   mjolnir  │  │  │  K3s cluster (k3s, namespace `pv`)   │    │
+   │   .8       │◄─┼──┤  control-plane: k3sm-pi (Pi, etcd).  │    │
+   │ Ubuntu 26.04│ │  │  workers:                            │    │
+   │  ─ MinIO   │  │  │    k3sa.hugin .120   k3sa.frigg .123 │    │
+   │    :9000   │  │  │    k3sa.hela  .121*  k3sa.munin .125 │    │
+   │  ─ MariaDB │  │  │    k3sa.freki .122   k3sa.idunn .126 │    │
+   │    :3306   │  │  │    k3sa.wahl  .124   k3sa.wikke .127 │    │
+   │  ─ NFS     │  │  │    thinkpad  .44                     │    │
+   │   /nfs-storage┘  │    *hela NotReady/SchedulingDisabled │    │
+   └────────────┘     └──────────────────────────────────────┘    │
+                      └───────────────────────────────────────────┘
 
    Pod placement (pv namespace):
      k3sa.freki.001 ── pv-api
@@ -317,7 +316,6 @@ SMTP (25), plus the NFS/SMB shares listed above.
 
 - **No tests anywhere** — verification is integration testing against the live
   cluster (documented policy).
-- `pv_bulk_upload` is dead code targeting removed endpoints.
 - The album counter in MariaDB can drift on re-uploads (silent MinIO overwrites
   still increment), with a manual audit/fix script as mitigation.
 - There's a documented history of the workflow forgetting the final
