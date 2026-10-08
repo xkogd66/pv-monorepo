@@ -20,7 +20,7 @@ const showMobileMenu = ref(false);
 const showMobileUserDropdown = ref(false);
 const searchQuery = ref("");
 const mobileSearchQuery = ref("");ible on md and below) -->
-      <button class="md:hidden text-xl text-gray-700" @click="toggleMobileMenu">
+      <button class="lg:hidden text-xl text-gray-700" @click="toggleMobileMenu">
         <i class="fas fa-bars"></i>
       </button>
 
@@ -140,7 +140,7 @@ const mobileSearchQuery = ref("");ible on md and below) -->
 
       <!-- Logo (visible on md and up) -->
       <div
-        class="hidden md:block text-xl text-gray-800 cursor-pointer"
+        class="hidden lg:block text-xl text-gray-800 cursor-pointer"
         @click="$emit('navigate', 'home')"
       >
         <i class="fas fa-camera text-2xl text-emerald-500 hover:text-emerald-700"></i>
@@ -148,7 +148,7 @@ const mobileSearchQuery = ref("");ible on md and below) -->
     </div>
 
     <!-- Center: Search + Navigation (hidden on md and below) -->
-    <div class="hidden md:flex gap-4 flex-wrap justify-center items-center">
+    <div class="hidden lg:flex gap-4 justify-center items-center">
       <!-- Search Input -->
       <div class="relative">
         <input
@@ -263,7 +263,7 @@ const mobileSearchQuery = ref("");ible on md and below) -->
 
       <!-- User Menu (hidden on sm, visible on md+) -->
       <div
-        class="hidden md:flex relative items-center gap-2 cursor-pointer"
+        class="hidden lg:flex relative items-center gap-2 cursor-pointer"
         @click="toggleUserDropdown"
         ref="userMenuRef"
       >
