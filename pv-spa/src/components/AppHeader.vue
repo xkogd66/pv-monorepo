@@ -3,7 +3,7 @@
     class="sticky top-0 z-30 flex items-center justify-between h-16 px-6 bg-white border-b border-gray-200 shadow-sm"
   >
     <!-- Left: Logo or Hamburger -->
-    <div class="flex items-center gap-4 relative">
+    <div class="flex items-center gap-4 relative" ref="mobileNavRef">
       <!-- const props = defineProps({
   currentView: String,
   currentUser: Object,
@@ -355,6 +355,7 @@ const healthDotRef = ref(null);
 const showStatsPopover = ref(false);
 const showMobileStats = ref(false);
 const statsBtnRef = ref(null);
+const mobileNavRef = ref(null);
 const showUserDropdown = ref(false);
 const showPasswordDialog = ref(false);
 const userMenuRef = ref(null);
@@ -499,11 +500,8 @@ const handleClickOutside = (e) => {
   }
   
   // Close mobile menu if clicking outside
-  // Check if the click target is not the hamburger button or within the mobile menu
-  const hamburgerButton = e.target.closest('button[class*="lg:hidden"]');
-  const mobileMenu = e.target.closest('[class*="absolute top-full left-0"]');
-  
-  if (showMobileMenu.value && !hamburgerButton && !mobileMenu) {
+  // mobileNavRef wraps both the hamburger and its menu
+  if (showMobileMenu.value && mobileNavRef.value && !mobileNavRef.value.contains(e.target)) {
     showMobileMenu.value = false;
   }
 };
