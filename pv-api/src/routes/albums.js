@@ -548,9 +548,12 @@ const updatePhotoMetadata = (minioClient) => async (req, res) => {
 
       const metadataJson = JSON.parse(currentMetadata);
 
-      // Find and update the specific photo's metadata
+      // Find and update the specific photo's metadata. The album JSON can hold
+      // duplicate entries for one sourceImage; the SPA lookup keeps the last one
+      // while findIndex would hit the first, so the edit looked unsaved.
+      const sourceImage = `${folderPath}/${objectName}`;
       const photoIndex = metadataJson.media.findIndex(
-        (item) => item.sourceImage === `${folderPath}/${objectName}`
+        (item) => item.sourceImage === sourceImage
       );
 
       if (photoIndex === -1) {
@@ -563,10 +566,14 @@ const updatePhotoMetadata = (minioClient) => async (req, res) => {
           `[albums.js (409)] METADATA JSON ${JSON.stringify(metadata)}`
         );
         // Update the metadata for this photo
-        metadataJson.media[photoIndex] = {
+        const updated = {
           ...metadataJson.media[photoIndex],
           ...metadata,
         };
+        // Replace the first match in place and drop any duplicates of it.
+        metadataJson.media = metadataJson.media.flatMap((item, i) =>
+          item.sourceImage !== sourceImage ? [item] : i === photoIndex ? [updated] : []
+        );
         debugAlbum(
           `[albums.js (414)] METADATA CHANGED TO >> ${JSON.stringify(
             metadataJson.media[photoIndex]

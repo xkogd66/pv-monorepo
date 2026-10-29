@@ -248,6 +248,24 @@ async function uploadVideoFiles() {
   });
 }
 
+// Resolves true to go ahead. A failed lookup doesn't block the upload — the check is a courtesy.
+async function confirmReplaceExisting() {
+  try {
+    const res = await apiService.getAlbumContents(props.albumName);
+    const objects = res?.album?.objects || res?.objects || [];
+    const existing = new Set(objects.map((o) => (o.name || '').split('/').pop().toLowerCase()));
+    const dupes = selectedFiles.value
+      .map((f) => f.name)
+      .filter((n) => existing.has(n.replace(/\.[^.]+$/, '.avif').toLowerCase()));
+    if (dupes.length === 0) return true;
+    const shown = dupes.slice(0, 10).join('\n') + (dupes.length > 10 ? `\n…and ${dupes.length - 10} more` : '');
+    return window.confirm(`${dupes.length} of ${selectedFiles.value.length} photo(s) already exist in this album:\n\n${shown}\n\nReplace them?`);
+  } catch (err) {
+    console.warn('[MediaUpload] duplicate check failed, continuing:', err);
+    return true;
+  }
+}
+
 async function uploadFiles() {
   if (selectedFiles.value.length === 0) return;
 
@@ -255,6 +273,9 @@ async function uploadFiles() {
     error.value = `You do not have permission to upload ${uploadType.value}`;
     return;
   }
+
+  // Photos are stored as <base>.avif, so IMG_1.heic and IMG_1.jpg collide with an existing IMG_1.avif.
+  if (uploadType.value === 'bulk-photos' && !(await confirmReplaceExisting())) return;
 
   uploading.value = true;
   uploadProgress.value = 0;
