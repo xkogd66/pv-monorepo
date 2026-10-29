@@ -58,7 +58,9 @@ export const fromDatetimeLocalPreservingOffset = (datetimeLocal, originalTimesta
     return `${datetimeLocal}:00${offset}`;
   }
 
-  const parsedDate = new Date(datetimeLocal);
-  if (!isValidDate(parsedDate)) return "";
-  return parsedDate.toISOString();
+  // No offset to preserve: store the typed wall-clock as-is with a "Z" suffix, the same
+  // convention pv-metadata uses for EXIF times without an offset. Going through
+  // toISOString() would convert to UTC and the display (which shows the string's
+  // wall-clock) would be off by the viewer's timezone offset.
+  return `${datetimeLocal}:00.000Z`;
 };

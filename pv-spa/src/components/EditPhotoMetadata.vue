@@ -36,17 +36,23 @@
         <!-- Handle timestamp -->
         <div class="mb-6 border-l-2 border-indigo-200 pl-4">
           <label class="block text-sm font-medium text-gray-700 mb-1">Timestamp</label>
-          <div class="relative">
-            <input 
-              type="datetime-local" 
-              v-model="timestampValue"
-              class="block w-full border border-gray-300 rounded-md px-3 py-2 pr-10 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          <!-- Time is a text field, not type="time": native time inputs follow the browser locale (AM/PM). -->
+          <div class="grid grid-cols-2 gap-2">
+            <input
+              type="date"
+              v-model="dateValue"
+              class="block w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             />
-            <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-              <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </div>
+            <input
+              type="text"
+              v-model="timeValue"
+              inputmode="numeric"
+              maxlength="5"
+              placeholder="HH:mm"
+              pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
+              title="24-hour time, e.g. 13:45"
+              class="block w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
           </div>
         </div>        <div class="flex justify-end gap-3 border-t pt-4 mt-6">
           <button 
@@ -124,6 +130,14 @@ if (editableMetadata.timestamp && editableMetadata.timestamp !== 'Invalid Date I
   timestampValue.value = toDatetimeLocalPreservingOffset(editableMetadata.timestamp);
 }
 
+// Date and 24h time are separate fields; timestampValue is "YYYY-MM-DDTHH:mm" built from them.
+const [initialDate = '', initialTime = ''] = timestampValue.value.split('T');
+const dateValue = ref(initialDate);
+const timeValue = ref(initialTime);
+watch([dateValue, timeValue], ([d, t]) => {
+  timestampValue.value = d && /^([01]\d|2[0-3]):[0-5]\d$/.test(t) ? `${d}T${t}` : '';
+});
+
 // Keep editableMetadata.timestamp in sync with picker
 watch(timestampValue, (newVal) => {
   editableMetadata.timestamp = fromDatetimeLocalPreservingOffset(
@@ -147,6 +161,11 @@ const latitude = ref(initialCoords.lat);
 const longitude = ref(initialCoords.lng);
 
 const saveMetadata = async () => {
+  // A date without a valid time would save an empty timestamp and wipe the old one.
+  if (dateValue.value && !timestampValue.value) {
+    showToast('Enter the time as HH:mm (24-hour), e.g. 13:45', { type: 'warning' });
+    return;
+  }
   try {
     // Combine latitude and longitude back into coordinates string
     if (latitude.value && longitude.value) {
