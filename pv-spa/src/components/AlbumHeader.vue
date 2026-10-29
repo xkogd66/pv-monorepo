@@ -81,6 +81,9 @@
 <script setup>
 import { computed } from "vue";
 import urlService from "../services/urlService.js";
+import { useToast } from "../composables/useToast";
+
+const { showToast } = useToast();
 
 const props = defineProps({
   albumName: { type: String, required: true },
@@ -111,7 +114,7 @@ const handleShare = async () => {
   } else {
     try {
       await navigator.clipboard.writeText(shareUrl);
-      alert("Link copied to clipboard!");
+      showToast("Link copied to clipboard", { type: "success" });
     } catch {
       // clipboard not available
     }

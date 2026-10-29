@@ -58,11 +58,9 @@
           </button>
           <button 
             type="submit"
-            :disabled="saved"
-            class="px-4 py-2 rounded-md text-white transition-colors duration-150"
-            :class="saved ? 'bg-emerald-600' : 'bg-indigo-600 hover:bg-indigo-700'"
+            class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors duration-150"
           >
-            {{ saved ? 'Saved ✓' : 'Save Changes' }}
+            Save Changes
           </button>
         </div>
       </form>
@@ -101,6 +99,7 @@ export default {
 <script setup>
 import { reactive, ref, watch } from 'vue';
 import apiService from '../services/api.js';
+import { useToast } from '../composables/useToast';
 import {
   toDatetimeLocalPreservingOffset,
   fromDatetimeLocalPreservingOffset
@@ -115,7 +114,7 @@ const emit = defineEmits(['save', 'close']);
 
 const editableMetadata = reactive({ ...props.photoMetadataLookup[props.photo.name] });
 const expanded = reactive({});
-const saved = ref(false);
+const { showToast } = useToast();
 
 // Timestamp value for native datetime-local input (YYYY-MM-DDTHH:mm format)
 const timestampValue = ref('');
@@ -182,14 +181,13 @@ const saveMetadata = async () => {
     // Update the local metadata lookup
     props.photoMetadataLookup[props.photo.name] = { ...editableMetadata };
     
-    // Show "Saved" briefly so the user sees the save landed, then close.
-    saved.value = true;
+    showToast('Metadata saved', { type: 'success' });
     emit('save', editableMetadata);
-    setTimeout(() => emit('close'), 1000);
+    emit('close');
     
   } catch (error) {
     console.error('Error saving metadata:', error);
-    alert(`Failed to save metadata: ${error.message}`);
+    showToast(`Failed to save metadata: ${error.message}`, { type: 'error' });
   }
 };
 

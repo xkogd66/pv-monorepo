@@ -115,6 +115,9 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import authService from '../services/auth.js'
 import apiService from '../services/api.js'
+import { useToast } from '../composables/useToast'
+
+const { showToast } = useToast()
 
 // Props
 const props = defineProps({
@@ -194,7 +197,7 @@ const handleFileSelect = (event) => {
   selectedFiles.value.push(...validFiles)
 
   if (validFiles.length !== files.length) {
-    alert(`Some files were skipped. Only ${uploadType.value === 'bulk-photos' ? 'images' : 'videos'} are allowed.`)
+    showToast(`Some files were skipped. Only ${uploadType.value === 'bulk-photos' ? 'images' : 'videos'} are allowed.`, { type: 'warning' })
   }
 }
 

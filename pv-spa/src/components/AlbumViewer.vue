@@ -146,16 +146,6 @@
       @delete-video="confirmDeleteVideo"
     />
 
-    <!-- Toasts -->
-    <div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 items-end" aria-live="polite">
-      <div
-        v-for="t in toasts"
-        :key="t.id"
-        class="max-w-xs w-full bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg border border-gray-800"
-      >
-        {{ t.message }}
-      </div>
-    </div>
   </div>
 </template>
 
@@ -205,7 +195,7 @@ const preloadStats = ref({
 });
 const progressTracker = ref(null);
 // Toasts
-const { toasts, showToast } = useToast();
+const { showToast } = useToast();
 const { jobs: trackedUploads, registerBulkUpload } = useUploadMonitor();
 const handledAlbumCompletions = new Set();
 
@@ -564,11 +554,14 @@ const deletePhoto = async () => {
         }
       }
       closeDeletePhotoDialog();
+      showToast("Photo deleted", { type: "success" });
     } else {
       error.value = response.error || "Failed to delete photo";
+      showToast(error.value, { type: "error" });
     }
   } catch (err) {
     error.value = `Failed to delete photo: ${err.message}`;
+    showToast(error.value, { type: "error" });
   } finally {
     deletingPhoto.value = false;
   }
@@ -579,12 +572,12 @@ const setCover = async (photo) => {
   try {
     const response = await apiService.updateAlbum(props.albumName, { cover: photo.name });
     if (response.success) {
-      showToast('Album cover updated');
+      showToast('Album cover updated', { type: 'success' });
     } else {
-      showToast(response.error || 'Failed to update album cover');
+      showToast(response.error || 'Failed to update album cover', { type: 'error' });
     }
   } catch (err) {
-    showToast(`Failed to update album cover: ${err.message}`);
+    showToast(`Failed to update album cover: ${err.message}`, { type: 'error' });
   }
 };
 

@@ -235,12 +235,14 @@ const selectedYear = ref(null)
 import { onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
 import apiService from '../services/api.js'
 import authService from '../services/auth.js'
+import { useToast } from '../composables/useToast'
 import CreateAlbumDialog from './CreateAlbumDialog.vue'
 import OneDriveImportDialog from './OneDriveImportDialog.vue'
 import AlbumCard from './AlbumCard.vue'
 
 // Emits
 const emit = defineEmits(['navigate', 'openAlbum'])
+const { showToast } = useToast()
 
 // Reactive state
 const loading = ref(false)
@@ -455,12 +457,14 @@ const handleCreateAlbum = async (albumData) => {
     if (response.success) {
       closeCreateDialog()
       await loadAlbums()
+      showToast(`Album "${albumData.name}" created`, { type: 'success' })
     } else {
       throw new Error(response.error || 'Failed to create album')
     }
   } catch (err) {
     console.error('[ALBUMS ERROR]', err)
     error.value = `Failed to create album: ${err.message}`
+    showToast(error.value, { type: 'error' })
   } finally {
     creating.value = false
   }
@@ -491,14 +495,17 @@ const deleteAlbum = async () => {
     const response = await apiService.deleteFolder(BUCKET_NAME, albumToDelete.value.name)
 
     if (response.success) {
+      const name = albumToDelete.value.name
       await loadAlbums()
       closeDeleteDialog()
+      showToast(`Album "${name}" deleted`, { type: 'success' })
     } else {
       throw new Error(response.error || 'Failed to delete album')
     }
   } catch (err) {
     console.error('[ALBUMS ERROR]', err)
     error.value = `Failed to delete album: ${err.message}`
+    showToast(error.value, { type: 'error' })
   } finally {
     deleting.value = false
   }
@@ -539,12 +546,14 @@ const saveAlbum = async () => {
     if (response.success) {
       await loadAlbums()
       closeEditDialog()
+      showToast('Album updated', { type: 'success' })
     } else {
       throw new Error(response.error || 'Failed to update album')
     }
   } catch (err) {
     console.error('[ALBUMS ERROR]', err)
     error.value = `Failed to update album: ${err.message}`
+    showToast(error.value, { type: 'error' })
   } finally {
     saving.value = false
   }

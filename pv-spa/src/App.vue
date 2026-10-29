@@ -70,6 +70,23 @@
       @close="closeSearchResults"
       @select-album="handleSearchAlbumSelect"
     />
+
+    <!-- Toasts (global; any component can call useToast().showToast) -->
+    <div class="fixed bottom-6 right-6 z-[60] flex flex-col gap-2 items-end" aria-live="polite">
+      <div
+        v-for="t in toasts"
+        :key="t.id"
+        class="max-w-xs w-full text-white px-4 py-2 rounded-lg shadow-lg"
+        :class="{
+          'bg-gray-900': t.type === 'info',
+          'bg-emerald-600': t.type === 'success',
+          'bg-red-600': t.type === 'error',
+          'bg-amber-600': t.type === 'warning',
+        }"
+      >
+        {{ t.message }}
+      </div>
+    </div>
   </div>
 </template>
 
@@ -86,7 +103,10 @@ import BulkUploadJobs from "./components/BulkUploadJobs.vue";
 import Register from "./components/Register.vue";
 import ShareDialog from "./components/ShareDialog.vue";
 import SearchResults from "./components/SearchResults.vue";
+import { useToast } from "./composables/useToast";
 import authService from "./services/auth.js";
+
+const { toasts } = useToast();
 import urlService from "./services/urlService.js";
 
 // Reactive state
