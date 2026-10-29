@@ -57,10 +57,12 @@
             Cancel
           </button>
           <button 
-            type="submit" 
-            class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors duration-150"
+            type="submit"
+            :disabled="saved"
+            class="px-4 py-2 rounded-md text-white transition-colors duration-150"
+            :class="saved ? 'bg-emerald-600' : 'bg-indigo-600 hover:bg-indigo-700'"
           >
-            Save Changes
+            {{ saved ? 'Saved ✓' : 'Save Changes' }}
           </button>
         </div>
       </form>
@@ -113,6 +115,7 @@ const emit = defineEmits(['save', 'close']);
 
 const editableMetadata = reactive({ ...props.photoMetadataLookup[props.photo.name] });
 const expanded = reactive({});
+const saved = ref(false);
 
 // Timestamp value for native datetime-local input (YYYY-MM-DDTHH:mm format)
 const timestampValue = ref('');
@@ -179,9 +182,10 @@ const saveMetadata = async () => {
     // Update the local metadata lookup
     props.photoMetadataLookup[props.photo.name] = { ...editableMetadata };
     
-    // Emit success event
+    // Show "Saved" briefly so the user sees the save landed, then close.
+    saved.value = true;
     emit('save', editableMetadata);
-    emit('close');
+    setTimeout(() => emit('close'), 1000);
     
   } catch (error) {
     console.error('Error saving metadata:', error);
