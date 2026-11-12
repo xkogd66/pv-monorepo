@@ -392,6 +392,63 @@ Gallery statistics (`BucketStats.vue`) live in the top nav, not on the landing p
 
 ---
 
+## Photo Metadata (`<album>/<album>.json`)
+
+Per-photo metadata lives in `media[]` of the album JSON in MinIO, keyed by `sourceImage`
+(`<album>/<name>.avif`). pv-metadata writes it at upload; the SPA edits it afterwards.
+
+**"Invalid date" / "not found" on a photo usually means the file had no EXIF, not a pipeline
+bug.** pv-metadata reads the *original* bytes, so a JPEG whose EXIF was stripped before upload
+(e.g. a photo taken inside Messenger/WhatsApp and then saved to Photos — JFIF + Photoshop
+headers, 1080×1920, Photos shows "No camera information") gets `"not found"` for date and GPS.
+Native-camera HEICs carry full EXIF. Photos keeps its own date/location in its library, which
+AirDrop does not write into the file. To embed them: iPhone Share → Options → Location →
+*All Photos Data*, or Mac Photos → File → Export → *Export 1 Photo…* with Location Information
+ticked (not "Unmodified Original"). The fix for such photos is the Edit Photo Metadata dialog.
+`formatMetadataTimestamp` shows the string `"not found"` as "Invalid date" (only an empty
+value gives "No date") — left as is.
+
+**Edit Photo Metadata** (`EditPhotoMetadata.vue` → `PUT /objects/:folderPath/:objectName`,
+admin; `updatePhotoMetadata` in `albums.js`):
+- Merges `coordinates`/`timestamp` into the entry; if coordinates are given the API
+  reverse-geocodes them (Mapbox) and overwrites `location`.
+- **Duplicate entries:** an album JSON can hold two entries for one `sourceImage` (seen on
+  `bcn.challenger.walkers`; cause unknown — pv-metadata's upsert removes same-name entries, so
+  re-uploads don't explain it, and a concurrent read-modify-write race is the best guess).
+  The SPA lookup (`AlbumViewer.loadAlbumMetadata`) keeps the *last* entry, while the save used to
+  update the *first* — so an edit returned 200 and was in MinIO but never showed. The save now
+  updates the first match and drops the other duplicates. A lost update (`IMG_1647` was missing
+  from that JSON entirely) was also seen and is not addressed.
+- **Timestamp convention:** a time with no offset is stored as the naive wall-clock with a
+  `Z` suffix (what pv-metadata does for EXIF times without an offset) and displayed as that same
+  wall-clock. The `Z` is not real UTC. `fromDatetimeLocalPreservingOffset` used to convert to
+  UTC via `toISOString()`, shifting the time by the viewer's offset on every first save. Photos
+  edited before the fix keep their shifted value until re-saved.
+- **24-hour time:** the dialog uses `<input type="date">` plus a text `HH:mm` field, because
+  native `datetime-local`/`time` inputs follow the browser locale (AM/PM in en-US Edge).
+  Trade-off: no clock picker. A date with an empty/invalid time is blocked with a toast so it
+  can't save an empty timestamp.
+
+## Upload duplicate prompt (`MediaUpload.vue`)
+
+Before a bulk photo upload, `confirmReplaceExisting()` fetches the album contents and compares
+names with the extension swapped to `.avif` (so `IMG_1.heic` collides with `IMG_1.avif`). If any
+match, a `window.confirm` lists up to 10 and asks to replace; Cancel aborts with nothing sent.
+Client-side only — the API still accepts duplicates if called directly. It fails open if the
+lookup errors, can't catch two simultaneous uploads, and doesn't cover videos.
+
+## Toasts
+
+`composables/useToast.js` (`showToast(message, { type, duration })`, types `info` default,
+`success`, `error`, `warning`) is rendered once, globally, in `App.vue` at `z-[60]` (above the
+lightbox's `z-50`). It used to be rendered only inside `AlbumViewer.vue`, so toasts only showed on
+the album page. In use: album create/edit/delete, photo delete, set cover, metadata save, link
+copied, skipped upload files. Left as browser dialogs on purpose: the Settings reset confirm and
+the duplicate-upload confirm — a toast can't ask a question. **Unverified:** none of the toast,
+duplicate-prompt or timestamp changes have been built or exercised in the app yet.
+
+---
+
 ## SPA Runtime Configuration
 
 The SPA is a static nginx-served Vue app. Runtime config (API URL, feature flags) is injected at container startup by an entrypoint script that reads env vars from the ConfigMap and writes `/usr/share/nginx/html/env-config.js`, which sets `window.__ENV__`.
