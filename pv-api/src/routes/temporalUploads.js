@@ -5,6 +5,7 @@ const debug = require("debug");
 const debugTemporal = debug("pv:server:temporal");
 const debugBulkApi = debug("pv:server:bulk");
 
+const { authenticateToken, requireRole } = require('../middleware/authMW');
 const database = require("../services/database-service");
 const { recountAlbum } = require("../services/album-counter");
 
@@ -153,6 +154,37 @@ module.exports = (getTemporalClient, config, { persistProgress, getProgress } = 
     });
 
     /**
+     * POST /bulk/cancel/:workflowId (admin)
+     * Terminates a running upload workflow. Terminate, not cancel: the image workflow
+     * catches per-file errors, so a cancellation would be counted as a failed file and
+     * the loop would carry on. Terminate stops scheduling new files at once; the file
+     * being processed right now may still finish, because the activity runs in the worker.
+     * Terminated workflows skip their own cleanupBatch, so the NFS staging dir is removed here.
+     */
+    router.post('/cancel/:workflowId', authenticateToken, requireRole('admin'), async (req, res) => {
+        if (!getTemporalClient()) return res.status(503).json({ error: 'Temporal client not available' });
+        const { workflowId } = req.params;
+        // Strict shape: the id is turned into a filesystem path below.
+        const m = /^(batch|video)-([0-9a-f-]{36})$/i.exec(workflowId);
+        if (!m) return res.status(400).json({ error: 'Invalid workflowId' });
+
+        try {
+            await getTemporalClient().workflow.getHandle(workflowId).terminate('Cancelled from Monitor page');
+        } catch (err) {
+            if (err.name === 'WorkflowNotFoundError') return res.status(404).json({ error: 'Workflow not found' });
+            debugBulkApi(`[cancel] terminate failed for ${workflowId}: ${err.message}`);
+            return res.status(500).json({ error: 'Failed to cancel workflow', message: err.message });
+        }
+
+        const nfsBase = config.temporal?.nfsPath || '/nfs-storage';
+        const dir = path.join(nfsBase, m[1] === 'video' ? workflowId : m[2]);
+        await fs.rm(dir, { recursive: true, force: true }).catch((e) =>
+            debugBulkApi(`[cancel] NFS cleanup failed for ${dir}: ${e.message}`));
+
+        return res.json({ success: true, workflowId });
+    });
+
+    /**
      * Status route to check on the workflow
      */
     router.get('/status/:workflowId', async (req, res) => {
@@ -199,6 +231,7 @@ module.exports = (getTemporalClient, config, { persistProgress, getProgress } = 
                         successful: progress.successful,
                         failed: progress.failed,
                         percentage: progress.percentage,
+                        failedFiles: progress.failedFiles ?? [],
                     };
                     response.meta = response.meta || {};
                     response.meta.progress = {
@@ -313,7 +346,7 @@ module.exports = (getTemporalClient, config, { persistProgress, getProgress } = 
                 }
 
                 const workflowId = execution?.workflowId || execution?.execution?.workflowId;
-                if (!workflowId || !workflowId.startsWith('batch-')) {
+                if (!workflowId || !(workflowId.startsWith('batch-') || workflowId.startsWith('video-'))) {
                     continue;
                 }
 
@@ -335,6 +368,7 @@ module.exports = (getTemporalClient, config, { persistProgress, getProgress } = 
 
                 jobs.push({
                     workflowId,
+                    // video-<id> keeps its prefix: the SPA's `batch-` lookup 404s and falls back to the raw id.
                     batchId: workflowId.replace(/^batch-/, ''),
                     status,
                     startTime: startTime ? startTime.toISOString() : null,
@@ -425,6 +459,7 @@ module.exports = (getTemporalClient, config, { persistProgress, getProgress } = 
                                             successful: persisted.successful ?? persisted.uploaded ?? null,
                                             failed: persisted.failed ?? null,
                                             percentage: persisted.percentage ?? null,
+                                            failedFiles: persisted.failedFiles ?? [],
                                         },
                                         meta: {
                                             startedAt: persisted.startedAt ?? null,
@@ -453,6 +488,7 @@ module.exports = (getTemporalClient, config, { persistProgress, getProgress } = 
                                         successful: progress.successful,
                                         failed: progress.failed,
                                         percentage: progress.percentage,
+                                        failedFiles: progress.failedFiles ?? [],
                                 },
                                 meta: {
                                         startedAt: progress.startedAt,

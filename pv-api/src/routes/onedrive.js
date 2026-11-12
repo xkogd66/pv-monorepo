@@ -31,7 +31,15 @@ const lsjson = async (relPath, flag) => {
 const FOLDER_TTL_MS = 24 * 60 * 60 * 1000;
 const folderCache = new Map(); // relPath -> { folders, at }
 
-module.exports = (getTemporalClient, config) => {
+// Names already stored directly under <album>/ in MinIO (not thumbs/ or the JSON).
+const listStored = async (minioClient, bucket, album) => {
+  const names = new Set();
+  const stream = minioClient.listObjectsV2(bucket, `${album}/`, false);
+  for await (const obj of stream) if (obj.name) names.add(obj.name.slice(album.length + 1));
+  return names;
+};
+
+module.exports = (getTemporalClient, config, minioClient) => {
   // GET /onedrive/folders?path=2023 — subfolders of photo-albums/<path>
   router.get("/folders", authenticateToken, requireRole("admin"), async (req, res) => {
     const relPath = req.query.path || "";
@@ -53,7 +61,7 @@ module.exports = (getTemporalClient, config) => {
   // (SPA creates it via POST /album/:name first). Files are downloaded by the
   // worker inside processBatchImages, so progress/monitoring is the bulk path's.
   router.post("/import", authenticateToken, requireRole("admin"), async (req, res) => {
-    const { path: relPath, albumName } = req.body || {};
+    const { path: relPath, albumName, resume } = req.body || {};
     if (!relPath || !albumName) {
       return res.status(400).json({ error: "path and albumName are required" });
     }
@@ -65,9 +73,14 @@ module.exports = (getTemporalClient, config) => {
     try {
       const batchId = randomUUID();
       const batchDir = path.join(config.temporal.nfsPath, batchId);
-      const images = (await lsjson(relPath, "--files-only"))
+      // resume: skip files whose result is already in the album (<name>.avif for images,
+      // <name> for videos), so an interrupted import carries on instead of redoing everything.
+      const stored = resume ? await listStored(minioClient, config.minio.bucketName, albumName) : new Set();
+      const candidates = (await lsjson(relPath, "--files-only"))
         .map((f) => ({ name: f.Name, type: mime.lookup(f.Name) }))
-        .filter((f) => IMAGE_TYPES.has(f.type) || VIDEO_EXT.test(f.name))
+        .filter((f) => IMAGE_TYPES.has(f.type) || VIDEO_EXT.test(f.name));
+      const images = candidates
+        .filter((f) => !stored.has(VIDEO_EXT.test(f.name) ? f.name : f.name.replace(/\.[^.]+$/, ".avif")))
         .map((f) => ({
           filename: f.name,
           path: path.join(batchDir, f.name),
@@ -75,6 +88,9 @@ module.exports = (getTemporalClient, config) => {
           remote: `${ROOT}/${relPath}/${f.name}`,
         }));
 
+      if (images.length === 0 && resume && candidates.length > 0) {
+        return res.json({ success: true, imageCount: 0, skipped: candidates.length, folder: albumName });
+      }
       if (images.length === 0) {
         return res.status(400).json({ error: "No JPEG, HEIC or video files in that folder" });
       }
@@ -86,7 +102,7 @@ module.exports = (getTemporalClient, config) => {
       });
 
       debugOneDrive(`import ${relPath} → ${albumName}: ${images.length} files, batch ${batchId}`);
-      res.status(202).json({ success: true, batchId, imageCount: images.length, folder: albumName });
+      res.status(202).json({ success: true, batchId, imageCount: images.length, skipped: candidates.length - images.length, folder: albumName });
     } catch (err) {
       debugOneDrive(`import failed: ${err.stderr || err.message}`);
       res.status(502).json({ error: "OneDrive import failed", message: err.stderr || err.message });

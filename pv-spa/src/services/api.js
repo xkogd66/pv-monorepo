@@ -170,10 +170,10 @@ async request(endpoint, options = {}) {
   }
 
   // OneDrive import into an existing album (202 Accepted + batchId, bulk workflow)
-  async importFromOneDrive(path, albumName) {
+  async importFromOneDrive(path, albumName, resume = false) {
     return this.request('/onedrive/import', {
       method: 'POST',
-      body: JSON.stringify({ path, albumName }),
+      body: JSON.stringify({ path, albumName, resume }),
     });
   }
 
@@ -259,6 +259,11 @@ async request(endpoint, options = {}) {
 
     const query = params.toString();
     return this.request(`/bulk/jobs${query ? `?${query}` : ''}`);
+  }
+
+  // Terminate a running upload workflow (admin)
+  async cancelBulkJob(workflowId) {
+    return this.request(`/bulk/cancel/${encodeURIComponent(workflowId)}`, { method: 'POST' });
   }
 
   // Poll for the latest progress for a bulk batch (dev-friendly)

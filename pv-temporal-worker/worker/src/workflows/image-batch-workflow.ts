@@ -58,6 +58,7 @@ export interface BatchProgressState {
   message: string | null;
   lastSuccessFile: string | null;
   lastFailedFile: string | null;
+  failedFiles: Array<{ filename: string; error: string }>;
   error: string | null;
   albumName: string | null;
 }
@@ -95,6 +96,7 @@ export async function processBatchImages(input: BatchInput): Promise<BatchResult
     message: `Accepted ${images.length} images for processing`,
     lastSuccessFile: null,
     lastFailedFile: null,
+    failedFiles: [],
     error: null,
     albumName: albumName ?? null,
   };
@@ -187,6 +189,7 @@ export async function processBatchImages(input: BatchInput): Promise<BatchResult
           : 0;
       progressState.updatedAt = new Date().toISOString();
       progressState.lastFailedFile = image.filename;
+      progressState.failedFiles.push({ filename: image.filename, error: errors.join(' | ').slice(0, 300) });
       progressState.message = `Processing images (${progressState.processed} of ${progressState.totalRequested} done)`;
 
       try {

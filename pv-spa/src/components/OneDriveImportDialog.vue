@@ -5,7 +5,11 @@
       <h3 class="text-lg font-semibold text-gray-800 mb-4">Import from OneDrive</h3>
 
       <p v-if="started" class="text-sm text-gray-700 mb-6">
-        Import of <strong>{{ albumName }}</strong> started. Follow it on the Monitor page.
+        <template v-if="nothingLeft">Everything in this folder is already in <strong>{{ albumName }}</strong>.</template>
+        <template v-else>
+          Import of <strong>{{ albumName }}</strong> started<template v-if="skipped"> ({{ skipped }} already imported, skipped)</template>.
+          Follow it on the Monitor page.
+        </template>
       </p>
 
       <template v-else>
@@ -37,9 +41,17 @@
             <input v-model="year" type="number" min="1900" max="2100" placeholder="Year"
               class="w-1/2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-emerald-500" />
           </div>
+          <label class="flex items-center gap-2 mb-4 text-sm text-gray-800 min-h-[44px]">
+            <input v-model="isPrivate" type="checkbox" class="h-4 w-4 accent-emerald-500" />
+            Private album (hidden from anonymous visitors)
+          </label>
         </template>
 
-        <p v-if="error" class="text-sm text-red-600 mb-4">{{ error }}</p>
+        <p v-if="error" class="text-sm text-red-600 mb-2">{{ error }}</p>
+        <button v-if="exists" @click="startImport(true)" :disabled="importing"
+          class="mb-4 text-sm text-emerald-700 underline disabled:opacity-60">
+          Resume import into the existing album (skips files already there)
+        </button>
       </template>
 
       <div class="flex justify-end gap-3">
@@ -47,11 +59,11 @@
           class="bg-gray-100 text-gray-800 border border-gray-300 px-4 py-2 min-h-[44px] rounded-md text-sm hover:bg-gray-200">
           {{ started ? 'Close' : 'Cancel' }}
         </button>
-        <button v-if="started" @click="$emit('monitor')"
+        <button v-if="started && !nothingLeft" @click="$emit('monitor')"
           class="bg-emerald-500 text-white px-4 py-2 min-h-[44px] rounded-md text-sm font-semibold hover:bg-emerald-600">
           Go to Monitor
         </button>
-        <button v-if="!started" @click="startImport" :disabled="!segments.length || !albumName.trim() || importing"
+        <button v-if="!started" @click="startImport(false)" :disabled="!segments.length || !albumName.trim() || importing"
           class="bg-emerald-500 text-white px-4 py-2 min-h-[44px] rounded-md text-sm font-semibold hover:bg-emerald-600 disabled:opacity-60 disabled:cursor-not-allowed">
           {{ importing ? 'Starting...' : 'Import this folder' }}
         </button>
@@ -78,6 +90,10 @@ const month = ref('')
 const year = ref('')
 const importing = ref(false)
 const started = ref(false)
+const isPrivate = ref(true)
+const exists = ref(false)
+const skipped = ref(0)
+const nothingLeft = ref(false)
 
 const load = async () => {
   loading.value = true
@@ -115,19 +131,24 @@ const enter = (folder) => {
   load()
 }
 
-const startImport = async () => {
+// resume=true skips album creation and any file already stored in the album.
+const startImport = async (resume = false) => {
   importing.value = true
   error.value = null
+  exists.value = false
   const name = albumName.value.trim()
   try {
-    // Private by default, same as "New album"; 409 if the name is taken.
-    await apiService.createFolder(name, null, month.value || null, year.value || null, true)
-    const res = await apiService.importFromOneDrive(segments.value.join('/'), name)
-    registerBulkUpload({ workflowId: `batch-${res.batchId}`, batchId: res.batchId, albumName: name })
+    // Private unless unticked; 409 if the name is taken (offers resume).
+    if (!resume) await apiService.createFolder(name, null, month.value || null, year.value || null, isPrivate.value)
+    const res = await apiService.importFromOneDrive(segments.value.join('/'), name, resume)
+    skipped.value = res.skipped || 0
+    nothingLeft.value = !res.batchId
+    if (res.batchId) registerBulkUpload({ workflowId: `batch-${res.batchId}`, batchId: res.batchId, albumName: name })
     started.value = true
     emit('imported')
   } catch (err) {
     error.value = err.message
+    exists.value = !resume && /already exists/i.test(err.message)
   } finally {
     importing.value = false
   }
@@ -136,6 +157,10 @@ const startImport = async () => {
 watch(() => props.visible, (v) => {
   if (!v) return
   started.value = false
+  exists.value = false
+  nothingLeft.value = false
+  skipped.value = 0
+  isPrivate.value = true
   open(0)
 })
 </script>

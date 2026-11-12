@@ -18,6 +18,7 @@ export async function reportProgress(progress: BatchProgressState | any): Promis
     timestamp: progress.updatedAt || new Date().toISOString(),
     state: progress.completedAt ? 'complete' : 'running',
     message: progress?.message ?? null,
+    failedFiles: progress?.failedFiles ?? [],
   };
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };

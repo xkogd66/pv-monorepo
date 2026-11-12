@@ -67,6 +67,15 @@
                 {{ job.status }}
               </span>
             </div>
+            <div v-if="job.status === 'RUNNING'" class="mt-2">
+              <button
+                class="rounded-md border border-red-300 bg-white px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
+                :disabled="cancelling[job.workflowId]"
+                @click="cancelJob(job)"
+              >
+                {{ cancelling[job.workflowId] ? 'Stopping...' : 'Stop upload' }}
+              </button>
+            </div>
             <div class="mt-2 text-xs text-gray-600">Workflow: <span class="font-mono break-all">{{ job.workflowId || '-' }}</span></div>
 
             <div class="mt-2 text-sm text-gray-700">
@@ -88,6 +97,17 @@
                 </div>
               </template>
               <span v-else class="text-gray-400">No progress sample yet</span>
+              <details v-if="progressMap[job.batchId]?.failedFiles?.length" class="mt-2 rounded-md border border-red-200 bg-red-50 p-2" :open="job.status !== 'RUNNING'">
+                <summary class="cursor-pointer text-xs font-medium text-red-700">
+                  {{ progressMap[job.batchId].failedFiles.length }} failed {{ progressMap[job.batchId].failedFiles.length === 1 ? 'file' : 'files' }}
+                </summary>
+                <ul class="mt-2 max-h-40 space-y-1 overflow-y-auto text-xs">
+                  <li v-for="f in progressMap[job.batchId].failedFiles" :key="f.filename">
+                    <span class="font-mono font-medium text-red-800 break-all">{{ f.filename }}</span>
+                    <span class="block text-red-600 break-words">{{ f.error }}</span>
+                  </li>
+                </ul>
+              </details>
             </div>
           </div>
         </div>
@@ -100,12 +120,29 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import apiService from '../services/api.js';
+import { useToast } from '../composables/useToast.js';
 
 const jobs = ref([]);
 const loading = ref(false);
 const error = ref('');
 const temporalStatusView = ref('RUNNING');
 const progressMap = ref({});
+const cancelling = ref({});
+const { showToast } = useToast();
+
+const cancelJob = async (job) => {
+  if (!window.confirm('Stop this upload? Files not yet processed will be skipped; the file in progress may still finish.')) return;
+  cancelling.value = { ...cancelling.value, [job.workflowId]: true };
+  try {
+    await apiService.cancelBulkJob(job.workflowId);
+    showToast('Upload stopped', { type: 'success' });
+    await loadJobs();
+  } catch (err) {
+    showToast(`Could not stop upload: ${err.message}`, { type: 'error' });
+  } finally {
+    cancelling.value = { ...cancelling.value, [job.workflowId]: false };
+  }
+};
 
 let progressInterval = null;
 let jobsInterval = null;
@@ -138,8 +175,11 @@ const loadJobs = async () => {
   }
 };
 
+// Running jobs are re-polled; finished jobs are fetched once so their failed-file list stays visible.
 const loadProgressForRunningJobs = async () => {
-  const running = jobs.value.filter((job) => job.status === 'RUNNING');
+  const running = jobs.value.filter(
+    (job) => job.batchId && (job.status === 'RUNNING' || !progressMap.value[job.batchId])
+  );
   if (running.length === 0) return;
 
   await Promise.all(
@@ -158,6 +198,7 @@ const loadProgressForRunningJobs = async () => {
                     current: processedVal,
                     uploaded: p.uploaded ?? p.successful ?? 0,
                     failed: p.failed ?? 0,
+                    failedFiles: p.failedFiles ?? [],
                     percentage: percentageVal,
                     // keep raw for debugging
                     _raw: p,
